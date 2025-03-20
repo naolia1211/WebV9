@@ -88,7 +88,7 @@ multidict==6.0.4
 multiprocess==0.70.15
 networkx==3.3
 nltk==3.8.1
-numpy==1.23.5
+# numpy==1.23.5
 oauthlib==3.2.2
 opt-einsum==3.3.0
 p==1.4.0
