@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>REGISTER PAGE</title>
+  <!-- Bootstrap 5 CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link rel="stylesheet" href="css/login.css" />
+  <link rel="stylesheet" href="global.css" />
+  <!-- Thêm style để đảm bảo text hiển thị rõ -->
+  <style>
+    .form-control {
+      color: white !important;
+      background-color: rgba(255, 255, 255, 0.1) !important;
+    }
+    .form-control::placeholder {
+      color: rgba(255, 255, 255, 0.7) !important;
+    }
+    .form-label {
+      color: white !important;
+      font-weight: 500;
+    }
+    .form-text {
+      color: rgba(255, 255, 255, 0.7) !important;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container my-5">
+    <div class="row justify-content-center mt-5">
+      <div class="col-md-6 col-lg-5">
+        <div class="card shadow">
+          <div class="card-body p-4">
+            <!-- Logo -->
+            <div class="text-center">
+              <img src="./assets/images/Loan_Crypto.png" width="270" height="270" alt="Loan Crypto Logo" />
+            </div>
+            <!-- Register Title with Reduced Margin -->
+            <h1 class="card-title text-center mb-2">Sign Up</h1>
+            <h6 class="card-title text-center mb-4" style="color: white; font-style: italic;font-weight:500;">
+              Join the Crypto Revolution - Where Wallets Disappear Faster Than Magic!
+            </h6>
+
+            <form id="registerForm" enctype="multipart/form-data">
+              <div class="mb-3">
+                <label for="name" class="form-label">Full Name</label>
+                <input type="text" class="form-control" id="name" placeholder="Enter your full name" required />
+              </div>
+              <div class="mb-3">
+                <label for="email" class="form-label">Email</label>
+                <input type="email" class="form-control" id="email" placeholder="Enter your email" required />
+              </div>
+              <div class="mb-3">
+                <label for="password" class="form-label">Password</label>
+                <input type="password" class="form-control" id="password" placeholder="Enter your password" required />
+              </div>
+              <div class="mb-3">
+                <label for="confirmPassword" class="form-label">Confirm Password</label>
+                <input type="password" class="form-control" id="confirmPassword" placeholder="Confirm your password" required />
+              </div>
+              <div class="mb-3">
+                <label for="privatePassword" class="form-label">Private Password</label>
+                <input type="password" class="form-control" id="privatePassword" placeholder="Enter your private password" required />
+                <div class="form-text">This password will be used for wallet operations</div>
+              </div>
+              <div class="mb-3">
+                <label for="profileImage" class="form-label">Profile Image</label>
+                <input type="file" class="form-control" id="profileImage" accept="image/*" required />
+              </div>
+              <div class="d-grid mb-3">
+                <button type="submit" class="btn btn-primary">Create Account</button>
+              </div>
+              <div id="errorMessage" class="alert alert-danger mt-3" style="display: none;"></div>
+            </form>
+            <div class="text-center mt-3">
+              <p style="color: #ffffff;">Already have an account? <a href="login.html" style="color: #3aaccb;">Sign in</a></p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Thêm jQuery trước Bootstrap -->
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="Scripts/register.js"></script>
+</body>
+
+</html>

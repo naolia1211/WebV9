@@ -1,0 +1,103 @@
+body {
+    background-color: #121212;
+    color: #ffffff;
+}
+
+a {
+    color: #0d6efd;
+    transition: color 0.3s ease;
+  }
+
+  a:hover {
+    color: #0a58ca;
+  }
+
+  /* Card Styling */
+  .card {
+    background-color: #1e1e1e;
+    border: none;
+    border-radius: 10px;
+  }
+
+  .card-title {
+    color: antiquewhite;
+    font-weight: bold;
+  }
+
+  /* Form Elements */
+  .form-label {
+    color: #ddd;
+  }
+
+  .form-control {
+    background-color: #333;
+    border: 1px solid #444;
+    color: #fff;
+  }
+
+  .form-control::placeholder {
+    color: #bbb;
+  }
+
+  .form-control:focus {
+    background-color: #333;
+    border-color: #0d6efd;
+    color: #fff;
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+  }
+
+  /* Buttons - Synced with Dark Theme */
+  .btn-primary {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+  }
+
+  .btn-primary:hover {
+    background-color: #7f6363;
+    border-color: #084298;
+  }
+
+  .btn-success {
+    background-color: #198754;
+    border-color: #198754;
+  }
+
+  .btn-success:hover {
+    background-color: #7e4406;
+    border-color: #146c43;
+  }
+
+  .nav-tabs {
+    border-bottom-color: #444;
+  }
+
+  .nav-tabs .nav-link {
+    color: #aaa;
+    border: none;
+    border-bottom: 2px solid transparent;
+    background-color: transparent;
+  }
+
+  .nav-tabs .nav-link:hover {
+    color: #fff;
+    border-color: transparent;
+    border-bottom: 2px solid #0d6efd;
+  }
+
+  .nav-tabs .nav-link.active {
+    color: #fff;
+    background-color: transparent;
+    border-color: transparent;
+    border-bottom: 2px solid #0d6efd;
+  }
+
+  .form-text {
+    color: #aaa;
+    font-size: 0.8rem;
+  }
+
+  .alert-danger {
+    background-color: rgba(220, 53, 69, 0.2);
+    color: #dc3545;
+    border-color: rgba(220, 53, 69, 0.3);
+  }

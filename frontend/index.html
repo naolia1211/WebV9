@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>DASHBOARD</title>
+    <!-- Bootstrap 5 CSS -->
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+      integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
+      crossorigin="anonymous"
+    />
+    <!-- Bootstrap Icons (Optional) -->
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css"
+    />
+    <link rel="stylesheet" href="css/index.css" />
+    <link rel="stylesheet" href="global.css" />
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+  </head>
+  <body>
+    <div class="container-fluid py-4">
+      <!-- Header -->
+      <!-- <div class="row mb-4" > -->
+      <!-- <div class="text-center"> -->
+      <!-- </div> -->
+      <!-- </div> -->
+
+      <!-- Profile Icon Section (shown before Tab Navigation) -->
+      <div class="row align-items-center">
+        <!-- Logo Column -->
+        <div class="col-4">
+          <img
+            src="./assets/images/Loan_Crypto.png"
+            alt="Loan Crypto Logo"
+            class="img-fluid"
+            style="max-width: 300px"
+          />
+        </div>
+        <!-- Profile Info Column -->
+        <div class="col-4">
+          <div class="d-flex align-items-center justify-content-center">
+            <img
+              id="headerUserImage"
+              src="./assets/images/avata.png"
+              alt="Profile"
+              class="profile-img me-3"
+              style="
+                width: 80px;
+                height: 80px;
+                object-fit: cover;
+                border-radius: 50%;
+                border: 2px solid #0d6efd;
+              "
+            />
+            <div class="profile-info">
+              <h6 class="mb-0">Hello, <span id="headerUserName"></span></h6>
+              <small id="headerUserEmail"></small>
+              <button
+                class="btn btn-custom btn-logout mt-2 d-flex align-items-center"
+                onclick="handleLogout()"
+              >
+                <i class="bi bi-box-arrow-right me-2"></i>
+                <span>Logout</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab Navigation -->
+      <ul
+        class="nav nav-tabs justify-content-center mb-4"
+        id="dashboardTabs"
+        role="tablist"
+      >
+        <li class="nav-item" role="presentation">
+          <button
+            class="nav-link active"
+            id="dashboard-tab"
+            data-bs-toggle="tab"
+            data-bs-target="#dashboard"
+            type="button"
+            role="tab"
+            aria-controls="dashboard"
+            aria-selected="true"
+          >
+            Dashboard
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button
+            class="nav-link"
+            id="transaction-tab"
+            data-bs-toggle="tab"
+            data-bs-target="#transaction"
+            type="button"
+            role="tab"
+            aria-controls="transaction"
+            aria-selected="false"
+          >
+            Transaction
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button
+            class="nav-link"
+            id="setting-tab"
+            data-bs-toggle="tab"
+            data-bs-target="#setting"
+            type="button"
+            role="tab"
+            aria-controls="setting"
+            aria-selected="false"
+          >
+            Setting
+          </button>
+        </li>
+      </ul>
+
+      <!-- Tab Content -->
+      <div class="tab-content" id="dashboardTabsContent">
+        <!-- Dashboard Tab -->
+        <div
+          class="tab-pane fade show active"
+          id="dashboard"
+          role="tabpanel"
+          aria-labelledby="dashboard-tab"
+        >
+          <div class="card mb-custom">
+            <div class="card-header d-flex justify-content-between align-items-center">
+              <h5 class="card-title mb-0">Wallet List</h5>
+              <button
+                class="btn btn-success"
+                data-bs-toggle="modal"
+                data-bs-target="#createModal"
+              >
+                <i class="bi bi-plus-circle me-2"></i>
+                <span>Create Wallet</span>
+              </button>
+            </div>
+            <div class="card-body">
+              <div class="table-responsive">
+                <table class="table table-dark table-striped">
+                  <thead>
+                    <tr>
+                      <th>Label</th>
+                      <th>Balance</th>
+                      <th>Address</th>
+                      <th>Creation Date</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <!-- Wallet data will be loaded here -->
+                  </tbody>
+                </table>
+              </div>
+              <div class="d-flex justify-content-between mt-3">
+                <button
+                  class="btn btn-warning me-2"
+                  data-bs-toggle="modal"
+                  data-bs-target="#exportModal"
+                >
+                  <i class="bi bi-download me-2"></i>
+                  <span>Export Wallet</span>
+                </button>
+                <button
+                  class="btn btn-info"
+                  data-bs-toggle="modal"
+                  data-bs-target="#importModal"
+                >
+                  <i class="bi bi-upload me-2"></i>
+                  <span>Import Wallet</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Transaction Tab -->
+        <div
+          class="tab-pane fade"
+          id="transaction"
+          role="tabpanel"
+          aria-labelledby="transaction-tab"
+        >
+          <div class="card mb-custom">
+            <div class="card-header d-flex justify-content-between align-items-center">
+              <h5 class="card-title mb-0">Transaction History</h5>
+              <div>
+                <button class="btn btn-primary me-2" data-bs-toggle="modal" data-bs-target="#transferModal">
+                  <i class="bi bi-arrow-left-right me-2"></i> Transfer
+                </button>
+                <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#depositModal">
+                  <i class="bi bi-plus-circle me-2"></i> Deposit
+                </button>
+              </div>
+            </div>
+            <div class="card-body">
+              <div class="table-responsive">
+                <table class="table table-dark table-striped">
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>From</th>
+                      <th>To</th>
+                      <th>Amount</th>
+                      <th>Type</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="transactionTableBody">
+                    <!-- Transaction data will be loaded here -->
+                    <tr>
+                      <td colspan="6" class="text-center">Loading transactions...</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div class="d-flex justify-content-end mt-3">
+                <button class="btn btn-info" data-bs-toggle="modal" data-bs-target="#searchModal">
+                  <i class="bi bi-search me-2"></i> Search Transactions
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Setting Tab -->
+        <div
+          class="tab-pane fade"
+          id="setting"
+          role="tabpanel"
+          aria-labelledby="setting-tab"
+        >
+          <div class="card mb-custom">
+            <div class="card-header">
+              <h5 class="card-title mb-0">Account Settings</h5>
+            </div>
+            <div class="card-body">
+              <!-- Profile Section -->
+              <div
+                class="d-flex flex-column align-items-center mb-4"
+                style="color: antiquewhite"
+              >
+                <img
+                  id="settingsUserImage"
+                  src="./assets/images/avata.png"
+                  alt="Profile Image"
+                  class="profile-img mb-3"
+                />
+                <h5 class="mb-1">Hello, <span id="settingsUserName"></span></h5>
+                <p class="mb-0" id="settingsUserEmail"></p>
+              </div>
+
+              <!-- Settings Buttons -->
+              <div class="d-flex justify-content-center gap-3 flex-wrap">
+                <!-- Change Name Button -->
+                <button
+                  class="btn btn-custom btn-reveal d-flex align-items-center"
+                  data-bs-toggle="modal"
+                  data-bs-target="#changeNameModal"
+                >
+                  <i class="bi bi-person me-2"></i>
+                  <span>Change Name</span>
+                </button>
+
+                <!-- Change Email Button -->
+                <button
+                  class="btn btn-custom btn-reveal d-flex align-items-center"
+                  data-bs-toggle="modal"
+                  data-bs-target="#changeEmailModal"
+                >
+                  <i class="bi bi-envelope me-2"></i>
+                  <span>Change Email</span>
+                </button>
+
+                <!-- Change Image Button -->
+                <button
+                  class="btn btn-custom btn-reveal d-flex align-items-center"
+                  data-bs-toggle="modal"
+                  data-bs-target="#changeImageModal"
+                >
+                  <i class="bi bi-image me-2"></i>
+                  <span>Change Image</span>
+                </button>
+
+                <!-- Change Password Button -->
+                <button
+                  class="btn btn-custom btn-reveal d-flex align-items-center"
+                  data-bs-toggle="modal"
+                  data-bs-target="#changePasswordModal"
+                >
+                  <i class="bi bi-lock me-2"></i>
+                  <span>Change Password</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Create Wallet Modal (Enter Label) -->
+    <div
+      class="modal fade"
+      id="createModal"
+      tabindex="-1"
+      aria-labelledby="createModalLabel"
+      aria-hidden="true"
+    >
+      <div class="modal-dialog">
+        <div class="modal-content bg-white text-dark">
+          <div class="modal-header">
+            <h5 class="modal-title" id="createModalLabel">
+              Enter Wallet Label
+            </h5>
+            <button
+              type="button"
+              class="btn-close"
+              data-bs-dismiss="modal"
+              aria-label="Close"
+            ></button>
+          </div>
+          <div class="modal-body">
+            <form id="createWalletForm">
+              <div class="mb-3">
+                <label for="walletLabel" class="form-label">Wallet Label</label>
+                <input
+                  type="text"
+                  class="form-control"
+                  id="walletLabel"
+                  placeholder="Enter a label for your wallet"
+                  required
+                />
+              </div>
+              <button
+                type="submit"
+                class="btn btn-custom btn-create d-flex align-items-center"
+              >
+                <i class="bi bi-plus-circle me-2"></i>
+                <span>Create Wallet</span>
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Reveal Wallet Modal (Enter Password) -->
+    <div
+      class="modal fade"
+      id="revealModal"
+      tabindex="-1"
+      aria-labelledby="revealModalLabel"
+      aria-hidden="true"
+    >
+      <div class="modal-dialog">
+        <div class="modal-content bg-white text-dark">
+          <div class="modal-header">
+            <h5 class="modal-title" id="revealModalLabel">
+              Enter Password to Reveal Wallet
+            </h5>
+            <button
+              type="button"
+              class="btn-close"
+              data-bs-dismiss="modal"
+              aria-label="Close"
+            ></button>
+          </div>
+          <div class="modal-body">
+            <form id="revealWalletForm">
+              <div class="mb-3">
+                <label for="walletPassword" class="form-label">Password</label>
+                <input
+                  type="password"
+                  class="form-control"
+                  id="walletPassword"
+                  placeholder="Enter your password"
+                  required
+                />
+              </div>
+              <button
+                type="submit"
+                class="btn btn-custom btn-reveal d-flex align-items-center"
+              >
+                <i class="bi bi-key me-2"></i>
+                <span>Reveal Wallet</span>
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Change Password Modal -->
+    <div
+      class="modal fade"
+      id="changePasswordModal"
+      tabindex="-1"
+      aria-labelledby="changePasswordModalLabel"
+      aria-hidden="true"
+    >
+      <div class="modal-dialog">
+        <div class="modal-content bg-white text-dark">
+          <div class="modal-header">
+            <h5 class="modal-title" id="changePasswordModalLabel">
+              Change Password
+            </h5>
+            <button
+              type="button"
+              class="btn-close"
+              data-bs-dismiss="modal"
+              aria-label="Close"
+            ></button>
+          </div>
+          <div class="modal-body">
+            <form id="changePasswordForm">
+              <div class="mb-3">
+                <label for="currentPassword" class="form-label"
+                  >Current Password</label
+                >
+                <input
+                  type="password"
+                  class="form-control"
+                  id="currentPassword"
+                  placeholder="Enter current password"
+                  required
+                />
+              </div>
+              <div class="mb-3">
+                <label for="newPassword" class="form-label">New Password</label>
+                <input
+                  type="password"
+                  class="form-control"
+                  id="newPassword"
+                  placeholder="Enter new password"
+                  required
+                />
+              </div>
+              <button
+                type="submit"
+                class="btn btn-custom btn-reveal d-flex align-items-center"
+              >
+                <i class="bi bi-lock me-2"></i>
+                <span>Change Password</span>
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Change Image Modal -->
+    <div class="modal fade" id="changeImageModal">
+      <div class="modal-dialog">
+        <div class="modal-content bg-white text-dark">
+          <div class="modal-header">
+            <h5 class="modal-title">Change Profile Image</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <form id="changeImageForm" enctype="multipart/form-data">
+              <div class="mb-3">
+                <label class="form-label">Upload New Image</label>
+                <input type="file" id="newImage" name="profile_image" class="form-control" accept="image/*" required>
+              </div>
+              <button type="submit" class="btn btn-custom btn-reveal d-flex align-items-center">
+                <i class="bi bi-image me-2"></i>
+                <span>Change Image</span>
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Change Name Modal -->
+    <div class="modal fade" id="changeNameModal">
+      <div class="modal-dialog">
+        <div class="modal-content bg-white text-dark">
+          <div class="modal-header">
+            <h5 class="modal-title">Change Name</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <form id="changeNameForm">
+              <div class="mb-3">
+                <label class="form-label">New Name</label>
+                <input type="text" id="newName" class="form-control" required>
+              </div>
+              <button type="submit" class="btn btn-custom btn-reveal d-flex align-items-center">
+                <i class="bi bi-check-lg me-2"></i>
+                <span>Save Changes</span>
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Change Email Modal -->
+    <div class="modal fade" id="changeEmailModal">
+      <div class="modal-dialog">
+        <div class="modal-content bg-white text-dark">
+          <div class="modal-header">
+            <h5 class="modal-title">Change Email</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <form id="changeEmailForm">
+              <div class="mb-3">
+                <label class="form-label">New Email</label>
+                <input type="email" id="newEmail" class="form-control" required>
+              </div>
+              <button type="submit" class="btn btn-custom btn-reveal d-flex align-items-center">
+                <i class="bi bi-check-lg me-2"></i>
+                <span>Save Changes</span>
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Transfer -->
+    <div class="modal fade" id="transferModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content bg-white text-dark">
+          <div class="modal-header">
+            <h5 class="modal-title">Transfer Money</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <form id="transferForm">
+              <div class="mb-3">
+                <label for="fromWallet" class="form-label">From Wallet</label>
+                <input type="text" class="form-control" id="fromWallet" required>
+              </div>
+              <div class="mb-3">
+                <label for="toWallet" class="form-label">To Wallet</label>
+                <input type="text" class="form-control" id="toWallet" required>
+              </div>
+              <div class="mb-3">
+                <label for="transferAmount" class="form-label">Amount</label>
+                <input type="text" class="form-control" id="transferAmount" required>
+              </div>
+              <div class="d-grid">
+                <button type="submit" class="btn btn-primary">Transfer</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Deposit -->
+    <div class="modal fade" id="depositModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content bg-white text-dark">
+          <div class="modal-header">
+            <h5 class="modal-title">Deposit Money</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <form id="depositForm">
+              <div class="mb-3">
+                <label for="depositWallet" class="form-label">Wallet Address</label>
+                <input type="text" class="form-control" id="depositWallet" required>
+              </div>
+              <div class="mb-3">
+                <label for="depositAmount" class="form-label">Amount</label>
+                <input type="text" class="form-control" id="depositAmount" required>
+              </div>
+              <div class="d-grid">
+                <button type="submit" class="btn btn-success">Deposit</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Search -->
+    <div class="modal fade" id="searchModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content bg-white text-dark">
+          <div class="modal-header">
+            <h5 class="modal-title">Search Transactions</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <form id="searchForm">
+              <div class="mb-3">
+                <label for="searchKeyword" class="form-label">Keyword</label>
+                <input type="text" class="form-control" id="searchKeyword" required>
+              </div>
+              <div class="d-grid">
+                <button type="submit" class="btn btn-info">Search</button>
+              </div>
+            </form>
+            <div class="mt-3">
+              <h6>Results:</h6>
+              <div id="searchResults" class="mt-2">
+                <!-- Search results will be displayed here -->
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Export -->
+    <div class="modal fade" id="exportModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content bg-white text-dark">
+          <div class="modal-header">
+            <h5 class="modal-title">Export Wallet Data</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <form id="exportForm">
+              <div class="mb-3">
+                <label for="exportWallet" class="form-label">Wallet Address</label>
+                <input type="text" class="form-control" id="exportWallet" required>
+              </div>
+              <div class="mb-3">
+                <label for="exportFormat" class="form-label">Format</label>
+                <select class="form-select" id="exportFormat">
+                  <option value="json">JSON</option>
+                  <option value="xml">XML</option>
+                  <option value="csv">CSV</option>
+                </select>
+              </div>
+              <div class="d-grid">
+                <button type="submit" class="btn btn-warning">Export</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Import -->
+    <div class="modal fade" id="importModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content bg-white text-dark">
+          <div class="modal-header">
+            <h5 class="modal-title">Import Wallet Data</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <form id="importForm" enctype="multipart/form-data">
+              <div class="mb-3">
+                <label for="importFile" class="form-label">File</label>
+                <input type="file" class="form-control" id="importFile" required>
+                <div class="form-text">Supported formats: JSON, XML</div>
+              </div>
+              <div class="d-grid">
+                <button type="submit" class="btn btn-danger">Import</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bootstrap 5 JS Bundle -->
+    <script
+      src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
+      integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
+      crossorigin="anonymous"
+    ></script>
+    <script src="Scripts/index.js"></script>
+  </body>
+</html>

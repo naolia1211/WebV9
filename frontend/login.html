@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LOGIN PAGE</title>
+  <link rel="icon" href="favicon.ico">
+  <!-- Bootstrap 5 CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link rel="stylesheet" href="css/login.css" />
+  <link rel="stylesheet" href="global.css" />
+  <!-- Thêm style để đảm bảo text hiển thị rõ -->
+  <style>
+    .form-control {
+      color: white !important;
+      background-color: rgba(255, 255, 255, 0.1) !important;
+    }
+    .form-control::placeholder {
+      color: rgba(255, 255, 255, 0.7) !important;
+    }
+    .form-label {
+      color: white !important;
+      font-weight: 500;
+    }
+    .form-text {
+      color: rgba(255, 255, 255, 0.7) !important;
+    }
+    .alert-danger {
+      background-color: rgba(220, 53, 69, 0.2) !important;
+      color: #fff !important;
+      border-color: rgba(220, 53, 69, 0.3) !important;
+    }
+  </style>
+  <!-- Thêm script để kiểm tra lỗi chuyển hướng -->
+  <script>
+    // Kiểm tra xem có token không
+    if (localStorage.getItem('access_token')) {
+      console.log('Token found in localStorage, redirecting...');
+      window.location.href = 'index.html';
+    }
+    
+    // Bắt lỗi không bắt được
+    window.addEventListener('error', function(e) {
+      console.error('Global error caught:', e.error);
+    });
+  </script>
+</head>
+
+<body>
+  <div class="container my-5">
+    <div class="row justify-content-center mt-5">
+      <div class="col-md-6 col-lg-5">
+        <div class="card shadow">
+          <div class="card-body p-4">
+            <!-- Logo -->
+            <div class="text-center">
+              <img src="./assets/images/Loan_Crypto.png" width="270" height="270" alt="Loan Crypto Logo" />
+            </div>
+            <!-- Login Title with Reduced Margin -->
+            <h1 class="card-title text-center mb-2">Sign In</h1>
+            <h6 class="card-title text-center mb-4" style="color: white; font-style: italic;font-weight:500;">
+              Flash Loans: Borrow Faster Than You Can Say 'Rug Pull'!
+            </h6>
+
+            <form id="loginForm">
+              <div class="mb-3">
+                <label for="email" class="form-label">Email</label>
+                <input type="text" class="form-control" id="email" placeholder="Enter your email" required />
+              </div>
+              <div class="mb-3">
+                <label for="password" class="form-label">Password</label>
+                <input type="password" class="form-control" id="password" placeholder="Enter your password" required />
+              </div>
+              <div class="d-grid mb-3">
+                <button type="submit" class="btn btn-primary">Sign In</button>
+              </div>
+              <div id="loginError" class="alert alert-danger mt-3" style="display: none;"></div>
+              <div class="row mb-2">
+                <div class="col text-center">
+                  <a href="#" class="text-decoration-none" style="color: #3aaccb;">Forgot password?</a>
+                </div>
+              </div>
+            </form>
+            <div class="text-center mt-3">
+              <p style="color: #ffffff;">Don't have an account? <a href="register.html" style="color: #3aaccb;">Sign up</a></p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Thêm jQuery trước Bootstrap -->
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="Scripts/login.js"></script>
+</body>
+
+</html>

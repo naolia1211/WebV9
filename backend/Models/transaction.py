@@ -1,0 +1,44 @@
+from pydantic import BaseModel, Field
+from typing import Optional
+from datetime import datetime
+
+class TransactionBase(BaseModel):
+    """Base model cho transaction"""
+    from_wallet: str = Field(..., description="Địa chỉ ví gửi")
+    to_wallet: str = Field(..., description="Địa chỉ ví nhận")
+    amount: float = Field(..., description="Số tiền giao dịch", gt=0)
+    type: str = Field(..., description="Loại giao dịch")
+    status: str = Field(..., description="Trạng thái giao dịch")
+
+class TransactionCreate(TransactionBase):
+    """Model cho việc tạo transaction mới"""
+    pass
+
+class Transaction(TransactionBase):
+    """Model đầy đủ cho transaction"""
+    id: int
+    timestamp: str = Field(
+        default_factory=lambda: datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    )
+
+    class Config:
+        from_attributes = True
+        json_schema_extra = {
+            "example": {
+                "id": 1,
+                "from_wallet": "0x1234567890abcdef",
+                "to_wallet": "0xabcdef1234567890",
+                "amount": 1.5,
+                "type": "transfer",
+                "status": "completed",
+                "timestamp": "2024-03-20 10:30:00"
+            }
+        }
+
+class TransactionResponse(BaseModel):
+    """Model cho response trả về client"""
+    status: str = "success"
+    transactions: list[Transaction]
+
+    class Config:
+        from_attributes = True
