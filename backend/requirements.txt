@@ -88,7 +88,6 @@ multidict==6.0.4
 multiprocess==0.70.15
 networkx==3.3
 nltk==3.8.1
-# numpy==1.23.5
 oauthlib==3.2.2
 opt-einsum==3.3.0
 p==1.4.0
@@ -119,7 +118,6 @@ python-jose==3.3.0
 python-multipart==0.0.5
 pytz==2023.3.post1
 pyunormalize==15.0.0
-pywin32==306
 PyYAML==6.0
 referencing==0.30.2
 regex==2023.8.8
