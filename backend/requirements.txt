@@ -1,4 +1,4 @@
 email_validator
 fastapi
-jose-python
 web3
+python-jose
