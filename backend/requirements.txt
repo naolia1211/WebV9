@@ -3,3 +3,4 @@ fastapi
 passlib
 web3
 python-jose
+python-multipart
