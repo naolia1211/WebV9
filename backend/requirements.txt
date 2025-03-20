@@ -18,8 +18,6 @@ cbor2
 certifi
 cffi
 charset-normalizer
-click
-click-didyoumean
 colorama
 contourpy
 cryptography
