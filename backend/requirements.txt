@@ -141,10 +141,6 @@ termcolor==2.3.0
 threadpoolctl==3.1.0
 tokenizers==0.19.1
 toolz==0.12.0
-torch==2.1.2
-torch_geometric==2.4.0
-torchaudio==2.1.2
-torchvision==0.16.2
 tqdm==4.66.1
 transformers==4.40.2
 typer==0.15.1
