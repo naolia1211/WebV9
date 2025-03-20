@@ -4,3 +4,4 @@ passlib
 web3
 python-jose
 python-multipart
+uvicorn
