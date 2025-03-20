@@ -119,8 +119,6 @@ referencing
 regex
 requests
 requests-oauthlib
-rich
-rich-toolkit
 rlp
 rpds-py
 rsa
