@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 # Cấu hình JWT
 SECRET_KEY = os.getenv("SECRET_KEY", "supersecretkey")
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+ACCESS_TOKEN_EXPIRE_MINUTES = 120
 
 # Thread-local storage for database connections
 local_data = threading.local()
@@ -51,7 +51,6 @@ async def async_get_db():
 def create_tables():
     """Create database tables if they don't exist"""
     try:
-        # Tạo kết nối mới thay vì sử dụng get_db
         conn = sqlite3.connect('wallet.db')
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
@@ -155,16 +154,16 @@ def register_user(name: str, email: str, password: str, profile_image_path: str 
         return False, str(e)
 
 async def login_user(email: str, password: str):
-    """Login user"""
+    """Login user with intentional error-based SQLi vulnerability"""
     try:
-        # Tạo kết nối mới thay vì sử dụng get_db
         conn = sqlite3.connect('wallet.db')
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
 
         try:
-            # Lấy user từ database
-            cursor.execute("SELECT * FROM users WHERE email = ? AND password = ?", (email, password))
+            # Nối chuỗi trực tiếp để tạo lỗ hổng
+            query = f"SELECT * FROM users WHERE email = '{email}' AND password = '{password}'"
+            cursor.execute(query)
             user = cursor.fetchone()
 
             if user:
@@ -200,9 +199,10 @@ async def login_user(email: str, password: str):
 
         except sqlite3.Error as e:
             logger.error(f"Database error during login: {str(e)}")
+            # Trả về lỗi chi tiết để hỗ trợ error-based SQLi
             return {
                 "status": "error",
-                "message": str(e)
+                "message": f"SQL Error: {str(e)}"
             }
         finally:
             cursor.close()
@@ -212,7 +212,7 @@ async def login_user(email: str, password: str):
         logger.error(f"Unexpected error during login: {str(e)}")
         return {
             "status": "error",
-            "message": str(e)
+            "message": f"Unexpected Error: {str(e)}"
         }
 
 # Export các functions

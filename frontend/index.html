@@ -268,16 +268,7 @@
                   <span>Change Name</span>
                 </button>
 
-                <!-- Change Email Button -->
-                <button
-                  class="btn btn-custom btn-reveal d-flex align-items-center"
-                  data-bs-toggle="modal"
-                  data-bs-target="#changeEmailModal"
-                >
-                  <i class="bi bi-envelope me-2"></i>
-                  <span>Change Email</span>
-                </button>
-
+                
                 <!-- Change Image Button -->
                 <button
                   class="btn btn-custom btn-reveal d-flex align-items-center"
@@ -288,15 +279,7 @@
                   <span>Change Image</span>
                 </button>
 
-                <!-- Change Password Button -->
-                <button
-                  class="btn btn-custom btn-reveal d-flex align-items-center"
-                  data-bs-toggle="modal"
-                  data-bs-target="#changePasswordModal"
-                >
-                  <i class="bi bi-lock me-2"></i>
-                  <span>Change Password</span>
-                </button>
+                
               </div>
             </div>
           </div>
@@ -396,63 +379,6 @@
       </div>
     </div>
 
-    <!-- Change Password Modal -->
-    <div
-      class="modal fade"
-      id="changePasswordModal"
-      tabindex="-1"
-      aria-labelledby="changePasswordModalLabel"
-      aria-hidden="true"
-    >
-      <div class="modal-dialog">
-        <div class="modal-content bg-white text-dark">
-          <div class="modal-header">
-            <h5 class="modal-title" id="changePasswordModalLabel">
-              Change Password
-            </h5>
-            <button
-              type="button"
-              class="btn-close"
-              data-bs-dismiss="modal"
-              aria-label="Close"
-            ></button>
-          </div>
-          <div class="modal-body">
-            <form id="changePasswordForm">
-              <div class="mb-3">
-                <label for="currentPassword" class="form-label"
-                  >Current Password</label
-                >
-                <input
-                  type="password"
-                  class="form-control"
-                  id="currentPassword"
-                  placeholder="Enter current password"
-                  required
-                />
-              </div>
-              <div class="mb-3">
-                <label for="newPassword" class="form-label">New Password</label>
-                <input
-                  type="password"
-                  class="form-control"
-                  id="newPassword"
-                  placeholder="Enter new password"
-                  required
-                />
-              </div>
-              <button
-                type="submit"
-                class="btn btn-custom btn-reveal d-flex align-items-center"
-              >
-                <i class="bi bi-lock me-2"></i>
-                <span>Change Password</span>
-              </button>
-            </form>
-          </div>
-        </div>
-      </div>
-    </div>
 
     <!-- Change Image Modal -->
     <div class="modal fade" id="changeImageModal">
@@ -502,31 +428,8 @@
       </div>
     </div>
 
-    <!-- Change Email Modal -->
-    <div class="modal fade" id="changeEmailModal">
-      <div class="modal-dialog">
-        <div class="modal-content bg-white text-dark">
-          <div class="modal-header">
-            <h5 class="modal-title">Change Email</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-          </div>
-          <div class="modal-body">
-            <form id="changeEmailForm">
-              <div class="mb-3">
-                <label class="form-label">New Email</label>
-                <input type="email" id="newEmail" class="form-control" required>
-              </div>
-              <button type="submit" class="btn btn-custom btn-reveal d-flex align-items-center">
-                <i class="bi bi-check-lg me-2"></i>
-                <span>Save Changes</span>
-              </button>
-            </form>
-          </div>
-        </div>
-      </div>
-    </div>
 
-    <!-- Modal Transfer -->
+    <!-- Modal Transfer  -->
     <div class="modal fade" id="transferModal" tabindex="-1" aria-hidden="true">
       <div class="modal-dialog">
         <div class="modal-content bg-white text-dark">
@@ -538,15 +441,30 @@
             <form id="transferForm">
               <div class="mb-3">
                 <label for="fromWallet" class="form-label">From Wallet</label>
-                <input type="text" class="form-control" id="fromWallet" required>
+                <select class="form-select" id="fromWallet" required>
+                  <option value="" disabled selected>Select wallet</option>
+                </select>
               </div>
               <div class="mb-3">
                 <label for="toWallet" class="form-label">To Wallet</label>
-                <input type="text" class="form-control" id="toWallet" required>
+                <input type="text" class="form-control" id="toWallet" required placeholder="Wallet address">
               </div>
               <div class="mb-3">
-                <label for="transferAmount" class="form-label">Amount</label>
-                <input type="text" class="form-control" id="transferAmount" required>
+                <label for="transferAmount" class="form-label">Amount (ETH)</label>
+                <input type="number" step="0.001" min="0.001" class="form-control" id="transferAmount" required>
+              </div>
+              <div class="mb-3">
+                <label for="transferPrivatePassword" class="form-label">Private Password</label>
+                <input type="password" class="form-control" id="transferPrivatePassword" required>
+                <small class="form-text text-muted">Enter your private password to confirm this transfer</small>
+              </div>
+              <div class="mb-3">
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" id="confirmTransfer" required>
+                  <label class="form-check-label" for="confirmTransfer">
+                    I confirm this transaction
+                  </label>
+                </div>
               </div>
               <div class="d-grid">
                 <button type="submit" class="btn btn-primary">Transfer</button>
@@ -569,12 +487,21 @@
             <form id="depositForm">
               <div class="mb-3">
                 <label for="depositWallet" class="form-label">Wallet Address</label>
-                <input type="text" class="form-control" id="depositWallet" required>
+                <select class="form-select" id="depositWallet" required>
+                  <option value="" disabled selected>Select wallet</option>
+                </select>
               </div>
               <div class="mb-3">
                 <label for="depositAmount" class="form-label">Amount</label>
-                <input type="text" class="form-control" id="depositAmount" required>
+                <input type="number" step="0.001" min="0.001" class="form-control" id="depositAmount" required>
               </div>
+              <div class="mb-3">
+                <label for="depositPrivatePassword" class="form-label">Private Password</label>
+                <input type="password" step="0.001" min="0.001" class="form-control" id="depositPrivatePassword" required>
+                <small class="form-text text-muted">Enter your private password to confirm this deposit</small>
+              </div>
+              <!-- Thêm vào form deposit -->
+
               <div class="d-grid">
                 <button type="submit" class="btn btn-success">Deposit</button>
               </div>
@@ -613,7 +540,7 @@
       </div>
     </div>
 
-    <!-- Modal Export -->
+    Modal Export
     <div class="modal fade" id="exportModal" tabindex="-1" aria-hidden="true">
       <div class="modal-dialog">
         <div class="modal-content bg-white text-dark">
@@ -643,31 +570,7 @@
         </div>
       </div>
     </div>
-
-    <!-- Modal Import -->
-    <div class="modal fade" id="importModal" tabindex="-1" aria-hidden="true">
-      <div class="modal-dialog">
-        <div class="modal-content bg-white text-dark">
-          <div class="modal-header">
-            <h5 class="modal-title">Import Wallet Data</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-          </div>
-          <div class="modal-body">
-            <form id="importForm" enctype="multipart/form-data">
-              <div class="mb-3">
-                <label for="importFile" class="form-label">File</label>
-                <input type="file" class="form-control" id="importFile" required>
-                <div class="form-text">Supported formats: JSON, XML</div>
-              </div>
-              <div class="d-grid">
-                <button type="submit" class="btn btn-danger">Import</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      </div>
-    </div>
-
+    
     <!-- Bootstrap 5 JS Bundle -->
     <script
       src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"

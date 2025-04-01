@@ -221,47 +221,15 @@ async def read_users_me(current_user: UserInDB = Depends(get_current_user)):
         }
     }
 
-@router.put("/update-profile")
-async def update_profile(
-    name: str = Form(...),
-    email: str = Form(...),
-    current_user: UserInDB = Depends(get_current_user)
-):
-    try:
-        conn = sqlite3.connect("wallet.db")
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-        
-        try:
-            cursor.execute(
-                "UPDATE users SET name = ?, email = ? WHERE id = ?",
-                (name, email, current_user.id)
-            )
-            conn.commit()
 
-            cursor.execute("SELECT * FROM users WHERE id = ?", (current_user.id,))
-            user = cursor.fetchone()
-
-            return {
-                "status": "success",
-                "user": {
-                    "id": user["id"],
-                    "name": user["name"],
-                    "email": user["email"],
-                    "profileImage": user["profileImage"] if "profileImage" in user.keys() else None
-                }
-            }
-        finally:
-            cursor.close()
-            conn.close()
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 @router.put("/change-name")
 async def change_name(
     new_name: str = Body(..., embed=True),
     current_user: UserInDB = Depends(get_current_user)
 ):
+    print(f"Received request to change name to: {new_name}")
+    print(f"Current user: {current_user}")
     try:
         conn = sqlite3.connect("wallet.db")
         conn.row_factory = sqlite3.Row
@@ -289,46 +257,12 @@ async def change_name(
             conn.close()
     except Exception as e:
         print(f"Error updating name: {str(e)}")
+        print(f"Error type: {type(e)}")
+        import traceback
+        print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.put("/change-email")
-async def change_email(
-    new_email: str = Body(..., embed=True),
-    current_user: UserInDB = Depends(get_current_user)
-):
-    try:
-        conn = sqlite3.connect("wallet.db")
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-        
-        try:
-            cursor.execute("SELECT id FROM users WHERE email = ? AND id != ?", 
-                         (new_email, current_user.id))
-            if cursor.fetchone():
-                raise HTTPException(status_code=400, detail="Email already exists")
 
-            cursor.execute(
-                "UPDATE users SET email = ? WHERE id = ?",
-                (new_email, current_user.id)
-            )
-            conn.commit()
-
-            return {
-                "status": "success",
-                "message": "Email updated successfully",
-                "user": {
-                    "id": current_user.id,
-                    "name": current_user.name,
-                    "email": new_email,
-                    "profileImage": current_user.profileImage
-                }
-            }
-        finally:
-            cursor.close()
-            conn.close()
-    except Exception as e:
-        print(f"Error updating email: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
 
 @router.put("/change-image")
 async def change_image(

@@ -5,17 +5,18 @@ from datetime import datetime
 class WalletBase(BaseModel):
     """Base model cho wallet"""
     user_id: int
-    address: str = Field(..., description="Địa chỉ ví")
+    address: str = Field(..., description="Địa chỉ ví trên blockchain")
     label: str = Field(default="My Wallet", description="Tên/nhãn của ví")
 
-class WalletCreate(WalletBase):
+class WalletCreate(BaseModel):
     """Model cho việc tạo wallet mới"""
-    private_key: Optional[str] = None  # Optional vì sẽ được generate tự động
+    user_id: int
+    label: Optional[str] = "My Wallet"
 
 class Wallet(WalletBase):
     """Model đầy đủ cho wallet"""
     id: int
-    balance: float = Field(default=0.0, description="Số dư của ví", ge=0)
+    balance: float = Field(default=0.0, description="Số dư của ví trên blockchain", ge=0)
     created_at: Optional[str] = None
     private_key: Optional[str] = None  # Chỉ trả về khi cần thiết
 
@@ -39,3 +40,10 @@ class WalletResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+class BlockchainTransfer(BaseModel):
+    """Model cho việc chuyển tiền trên blockchain"""
+    from_wallet: str
+    to_wallet: str
+    amount: float
+    confirm: bool = True

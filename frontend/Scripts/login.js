@@ -1,3 +1,5 @@
+const baseUrl = 'http://localhost:8000'
+
 document.addEventListener('DOMContentLoaded', function() {
     // Kiểm tra nếu đã đăng nhập thì chuyển hướng
     if (localStorage.getItem('access_token') && localStorage.getItem('user_info')) {
@@ -33,7 +35,7 @@ document.addEventListener('DOMContentLoaded', function() {
             formData.append('username', email);  // OAuth2 yêu cầu tên field là 'username'
             formData.append('password', password);
             
-            fetch('http://127.0.0.1:8000/api/auth/login', {
+            fetch(`${baseUrl}/api/auth/login`, {
                 method: 'POST',
                 body: formData
             })
@@ -93,7 +95,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             
             // Direct API call without validation
-            const response = await fetch('http://127.0.0.1:8000/api/auth/signup', {
+            const response = await fetch(`${baseUrl}/api/auth/signup`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'

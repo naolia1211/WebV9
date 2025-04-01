@@ -12,6 +12,7 @@ import logging
 import time
 import threading
 from contextlib import contextmanager
+from blockchain_service import BlockchainService
 
 # Thiết lập logging
 logging.basicConfig(level=logging.INFO)
@@ -20,6 +21,8 @@ logger = logging.getLogger(__name__)
 class WalletRepository:
     def __init__(self, db: Connection):
         self.db = db
+        # Thêm blockchain service
+        self.blockchain = BlockchainService()
         self._ensure_table_exists()
     
     def _ensure_table_exists(self):
@@ -85,49 +88,83 @@ class WalletRepository:
                     amount REAL NOT NULL,
                     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     type TEXT NOT NULL,
-                    status TEXT NOT NULL
+                    status TEXT NOT NULL,
+                    hash TEXT,
+                    block_number INTEGER
                 )
                 ''')
                 self.db.commit()
                 logger.info("Created transactions table")
+            else:
+                # Kiểm tra và thêm cột hash và block_number nếu chưa có
+                cursor.execute("PRAGMA table_info(transactions)")
+                columns = [col[1] for col in cursor.fetchall()]
+                
+                if "hash" not in columns:
+                    logger.info("Adding hash column to transactions table")
+                    cursor.execute("ALTER TABLE transactions ADD COLUMN hash TEXT")
+                    self.db.commit()
+                
+                if "block_number" not in columns:
+                    logger.info("Adding block_number column to transactions table")
+                    cursor.execute("ALTER TABLE transactions ADD COLUMN block_number INTEGER")
+                    self.db.commit()
                 
         except Exception as e:
             logger.error(f"Error ensuring wallet table: {str(e)}")
             raise
 
     def create_wallet(self, wallet_data: Dict[str, Any]) -> int:
-        """Tạo ví mới"""
+        """Tạo ví mới trên blockchain"""
         try:
             logger.info(f"Creating new wallet with data: {wallet_data}")
             
             cursor = self.db.cursor()
             
             # Kiểm tra dữ liệu đầu vào
-            required_fields = ["user_id", "address", "private_key", "label"]
-            for field in required_fields:
-                if field not in wallet_data:
-                    logger.error(f"Missing required field: {field}")
-                    return None
-                
+            if "user_id" not in wallet_data:
+                logger.error("Missing required field: user_id")
+                return None
+            
+            # Tạo ví thực trên blockchain
+            blockchain_wallet = self.blockchain.create_wallet()
+            
+            # Đảm bảo private_key có định dạng đúng
+            private_key = blockchain_wallet["private_key"]
+            if not private_key.startswith("0x"):
+                private_key = "0x" + private_key
+            
+            # Cập nhật dữ liệu ví
+            new_wallet = {
+                "user_id": wallet_data["user_id"],
+                "label": wallet_data.get("label", "My Wallet"),
+                "address": blockchain_wallet["address"],
+                "private_key": private_key,  # Sử dụng private key đã chuẩn hóa
+                "balance": 0
+            }
+            
             cursor.execute(
                 "INSERT INTO wallets (user_id, address, private_key, label, balance) VALUES (?, ?, ?, ?, ?)",
                 (
-                    wallet_data["user_id"],
-                    wallet_data["address"],
-                    wallet_data["private_key"],
-                    wallet_data["label"],
-                    wallet_data.get("balance", 0)
+                    new_wallet["user_id"],
+                    new_wallet["address"],
+                    new_wallet["private_key"],
+                    new_wallet["label"],
+                    new_wallet["balance"]
                 )
             )
             self.db.commit()
             
-            return cursor.lastrowid
+            wallet_id = cursor.lastrowid
+            logger.info(f"Created blockchain wallet with ID: {wallet_id}")
+            
+            return wallet_id
         except Exception as e:
             logger.error(f"Error creating wallet: {str(e)}")
             return None
     
     def get_wallet_by_id(self, wallet_id: int) -> Optional[Dict[str, Any]]:
-        """Lấy thông tin ví theo ID"""
+        """Lấy thông tin ví theo ID và cập nhật số dư từ blockchain"""
         try:
             logger.info(f"Getting wallet by ID: {wallet_id}")
             
@@ -153,6 +190,18 @@ class WalletRepository:
                 "created_at": wallet_data[6]
             }
             
+            # Cập nhật số dư từ blockchain
+            blockchain_balance = self.blockchain.get_balance(wallet["address"])
+            
+            # Cập nhật database nếu số dư khác
+            if abs(float(blockchain_balance) - float(wallet["balance"])) > 0.0001:
+                cursor.execute(
+                    "UPDATE wallets SET balance = ? WHERE id = ?",
+                    (blockchain_balance, wallet_id)
+                )
+                self.db.commit()
+                wallet["balance"] = blockchain_balance
+            
             logger.info(f"Found wallet: {wallet}")
             return wallet
         except Exception as e:
@@ -160,7 +209,7 @@ class WalletRepository:
             return None
     
     def get_wallets_by_user_id(self, user_id: int) -> List[Dict[str, Any]]:
-        """Lấy danh sách ví của user"""
+        """Lấy danh sách ví của user và cập nhật số dư từ blockchain"""
         try:
             cursor = self.db.cursor()
             cursor.execute("""
@@ -181,6 +230,19 @@ class WalletRepository:
                     "balance": float(row[5]),
                     "created_at": row[6]
                 }
+                
+                # Cập nhật số dư từ blockchain
+                blockchain_balance = self.blockchain.get_balance(wallet["address"])
+                
+                # Cập nhật database nếu số dư khác
+                if abs(blockchain_balance - wallet["balance"]) > 0.0001:
+                    cursor.execute(
+                        "UPDATE wallets SET balance = ? WHERE id = ?",
+                        (blockchain_balance, wallet["id"])
+                    )
+                    self.db.commit()
+                    wallet["balance"] = blockchain_balance
+                
                 wallets.append(wallet)
             
             return wallets
@@ -190,7 +252,7 @@ class WalletRepository:
             raise
     
     def get_wallet_by_address(self, address: str) -> Optional[Dict[str, Any]]:
-        """Lấy thông tin ví theo địa chỉ"""
+        """Lấy thông tin ví theo địa chỉ và cập nhật số dư từ blockchain"""
         try:
             logger.info(f"Getting wallet by address: {address}")
             
@@ -216,10 +278,51 @@ class WalletRepository:
                 "created_at": wallet_data[6]
             }
             
+            # Cập nhật số dư từ blockchain
+            blockchain_balance = self.blockchain.get_balance(address)
+            
+            # Cập nhật database nếu số dư khác
+            if abs(float(blockchain_balance) - float(wallet["balance"])) > 0.0001:
+                cursor.execute(
+                    "UPDATE wallets SET balance = ? WHERE id = ?",
+                    (blockchain_balance, wallet["id"])
+                )
+                self.db.commit()
+                wallet["balance"] = blockchain_balance
+            
             logger.info(f"Found wallet: {wallet}")
             return wallet
         except Exception as e:
             logger.error(f"Error getting wallet by address: {str(e)}")
+            return None
+    
+    def get_wallet_by_address_no_blockchain(self, address: str) -> Optional[Dict[str, Any]]:
+        """Lấy thông tin ví theo địa chỉ không cập nhật số dư từ blockchain"""
+        try:
+            cursor = self.db.cursor()
+            cursor.execute(
+                "SELECT id, user_id, address, private_key, label, balance, created_at FROM wallets WHERE address = ?",
+                (address,)
+            )
+            
+            wallet_data = cursor.fetchone()
+            
+            if not wallet_data:
+                return None
+            
+            wallet = {
+                "id": wallet_data[0],
+                "user_id": wallet_data[1],
+                "address": wallet_data[2],
+                "private_key": wallet_data[3],
+                "label": wallet_data[4],
+                "balance": wallet_data[5],
+                "created_at": wallet_data[6]
+            }
+            
+            return wallet
+        except Exception as e:
+            logger.error(f"Error getting wallet by address (no blockchain): {str(e)}")
             return None
     
     def update_wallet(self, wallet_id: int, wallet_data: Dict[str, Any]) -> bool:
@@ -241,9 +344,7 @@ class WalletRepository:
                 updates.append("label = ?")
                 params.append(wallet_data["label"])
             
-            if "balance" in wallet_data:
-                updates.append("balance = ?")
-                params.append(wallet_data["balance"])
+            # Không cập nhật balance thủ công, vì sẽ lấy từ blockchain
             
             if not updates:
                 logger.warning("No fields to update")
@@ -288,109 +389,195 @@ class WalletRepository:
             logger.error(f"Error deleting wallet: {str(e)}")
             return False
     
-    def transfer(self, from_address: str, to_address: str, amount: float) -> bool:
-        """Chuyển tiền giữa các ví"""
+    def transfer(self, from_address: str, to_address: str, amount: float, private_key: str) -> tuple:
         try:
-            logger.info(f"Transferring {amount} from {from_address} to {to_address}")
+            logger.info(f"Transferring {amount} ETH from {from_address} to {to_address}")
             
-            # Kiểm tra ví nguồn
-            source_wallet = self.get_wallet_by_address(from_address)
-            if not source_wallet:
-                logger.warning(f"Source wallet not found: {from_address}")
-                return False
-            
-            # Kiểm tra ví đích
-            dest_wallet = self.get_wallet_by_address(to_address)
-            if not dest_wallet:
-                logger.warning(f"Destination wallet not found: {to_address}")
-                return False
+            # Chuẩn hóa private key
+            private_key = private_key.strip()
+            if not private_key.startswith("0x"):
+                private_key = "0x" + private_key
             
             # Kiểm tra số dư
-            if float(source_wallet["balance"]) < amount:
-                logger.warning(f"Insufficient balance: {source_wallet['balance']} < {amount}")
-                return False
+            blockchain_balance = self.blockchain.get_balance(from_address)
+            if blockchain_balance < amount:
+                return False, f"Insufficient balance: {blockchain_balance} < {amount}"
             
-            # Cập nhật số dư
-            cursor = self.db.cursor()
-            
-            # Trừ tiền từ ví nguồn
-            cursor.execute(
-                "UPDATE wallets SET balance = balance - ? WHERE address = ?",
-                (amount, from_address)
+            # Thực hiện giao dịch trên blockchain
+            result = self.blockchain.send_transaction(
+                from_address,
+                to_address,
+                amount,
+                private_key
             )
             
-            # Cộng tiền vào ví đích
-            cursor.execute(
-                "UPDATE wallets SET balance = balance + ? WHERE address = ?",
-                (amount, to_address)
-            )
+            if isinstance(result, dict) and result.get("status") == "failed":
+                error_msg = result.get("error", "Unknown error")
+                return False, error_msg
             
-            self.db.commit()
+            # Tạo giao dịch trong database
+            transaction = {
+                "from_wallet": from_address,
+                "to_wallet": to_address,
+                "amount": amount,
+                "timestamp": datetime.now().isoformat(),
+                "type": "transfer",
+                "status": "success",
+                "hash": result.get("hash"),
+                "block_number": result.get("block_number")
+            }
             
-            logger.info(f"Transfer completed successfully")
-            return True
+            # Lưu giao dịch vào database
+            self.save_transaction_history(transaction)
+            
+            # Cập nhật số dư trong database
+            self.update_wallet_balances([from_address, to_address])
+            
+            return True, result
         except Exception as e:
-            logger.error(f"Error transferring funds: {str(e)}")
-            return False
-    
-    def deposit(self, wallet_address: str, amount: float) -> bool:
-        """Nạp tiền vào ví"""
+            return False, str(e)
+
+    def deposit_from_ganache(self, to_address: str, amount: float) -> tuple:
+        """Nạp tiền từ tài khoản Ganache vào ví đích"""
         try:
-            logger.info(f"Depositing {amount} to {wallet_address}")
+            logger.info(f"Nạp {amount} ETH vào {to_address}")
+            w3 = self.blockchain.w3
             
-            # Kiểm tra ví
-            wallet = self.get_wallet_by_address(wallet_address)
-            if not wallet:
-                logger.warning(f"Wallet not found: {wallet_address}")
-                return False
+            # Kiểm tra kết nối
+            if not w3.is_connected():
+                return False, "Không kết nối được với blockchain"
             
-            # Cập nhật số dư
+            # Kiểm tra địa chỉ hợp lệ
+            if not self.blockchain.is_valid_eth_address(to_address):
+                return False, "Invalid Ethereum wallet address format"
+            
+            # Kiểm tra ví đích trong database
             cursor = self.db.cursor()
-            cursor.execute(
-                "UPDATE wallets SET balance = balance + ? WHERE address = ?",
-                (amount, wallet_address)
-            )
-            self.db.commit()
+            cursor.execute("SELECT * FROM wallets WHERE address = ?", (to_address,))
+            if not cursor.fetchone():
+                return False, f"Ví đích không tồn tại trong hệ thống"
             
-            logger.info(f"Deposit completed successfully")
-            return True
-        except Exception as e:
-            logger.error(f"Error depositing funds: {str(e)}")
-            return False
-    
-    def get_transactions_by_wallet(self, wallet_address: str) -> List[Dict[str, Any]]:
-        """Lấy danh sách giao dịch của ví"""
-        try:
-            logger.info(f"Getting transactions for wallet: {wallet_address}")
+            # Lấy danh sách tài khoản Ganache
+            ganache_accounts = w3.eth.accounts
+            if not ganache_accounts:
+                return False, "Không tìm thấy tài khoản Ganache"
             
-            cursor = self.db.cursor()
-            cursor.execute(
-                "SELECT id, from_wallet, to_wallet, amount, timestamp, type, status FROM transactions WHERE from_wallet = ? OR to_wallet = ? ORDER BY timestamp DESC",
-                (wallet_address, wallet_address)
-            )
+            # Chuẩn bị thông tin giao dịch
+            amount_wei = w3.to_wei(amount, "ether")
+            gas_estimate = 21000
+            gas_price = w3.eth.gas_price
+            total_needed = amount_wei + (gas_estimate * gas_price)
             
-            transactions_data = cursor.fetchall()
+            # Tìm tài khoản có đủ số dư
+            sender_account = None
+            for account in ganache_accounts:
+                if w3.eth.get_balance(account) >= total_needed:
+                    sender_account = account
+                    break
             
-            transactions = []
-            for tx_data in transactions_data:
-                transaction = {
-                    "id": tx_data[0],
-                    "from_wallet": tx_data[1],
-                    "to_wallet": tx_data[2],
-                    "amount": tx_data[3],
-                    "timestamp": tx_data[4],
-                    "type": tx_data[5],
-                    "status": tx_data[6]
+            if not sender_account:
+                return False, "Không có tài khoản Ganache nào có đủ số dư"
+            
+            # Tạo giao dịch
+            tx = {
+                "from": sender_account,
+                "to": to_address,
+                "value": amount_wei,
+                "gas": gas_estimate,
+                "gasPrice": gas_price,
+                "nonce": w3.eth.get_transaction_count(sender_account),
+                "chainId": w3.eth.chain_id
+            }
+            
+            # Gửi giao dịch
+            try:
+                tx_hash = w3.eth.send_transaction(tx)
+                tx_hash_hex = tx_hash.hex()
+                
+                # Đợi giao dịch được xác nhận
+                receipt = w3.eth.wait_for_transaction_receipt(tx_hash, timeout=60)
+                
+                if receipt.status != 1:
+                    return False, "Giao dịch thất bại"
+                
+                # Cập nhật số dư và lưu giao dịch
+                new_balance = self.blockchain.get_balance(to_address)
+                cursor.execute("UPDATE wallets SET balance = ? WHERE address = ?", (new_balance, to_address))
+                self.db.commit()
+                
+                # Lưu thông tin giao dịch
+                transaction_data = {
+                    "from_wallet": sender_account,
+                    "to_wallet": to_address,
+                    "amount": amount,
+                    "timestamp": datetime.now().isoformat(),
+                    "type": "deposit",
+                    "status": "success",
+                    "hash": tx_hash_hex,
+                    "block_number": receipt.blockNumber
                 }
-                transactions.append(transaction)
-            
-            logger.info(f"Found {len(transactions)} transactions for wallet {wallet_address}")
-            return transactions
+                
+                self.save_transaction_history(transaction_data)
+                
+                return True, {
+                    "hash": tx_hash_hex,
+                    "from": sender_account,
+                    "amount": amount,
+                    "new_balance": new_balance
+                }
+            except Exception as tx_error:
+                return False, f"Lỗi giao dịch: {str(tx_error)}"
         except Exception as e:
-            logger.error(f"Error getting transactions by wallet: {str(e)}")
-            return []
+            return False, str(e)
+
+    def update_wallet_balances(self, addresses: List[str]) -> dict:
+        """Cập nhật số dư của các ví từ blockchain và trả về kết quả"""
+        results = {}
+        
+        for address in addresses:
+            try:
+                # Kiểm tra địa chỉ có hợp lệ không
+                if not self.blockchain.is_valid_eth_address(address):
+                    logger.warning(f"Skipping invalid address: {address}")
+                    results[address] = {"success": False, "error": "Invalid address"}
+                    continue
+                    
+                # Kiểm tra ví có trong database không
+                wallet = self.get_wallet_by_address_no_blockchain(address) if hasattr(self, 'get_wallet_by_address_no_blockchain') else None
+                
+                if not wallet:
+                    # Nếu ví không có trong database, bỏ qua việc cập nhật
+                    logger.info(f"Wallet {address} not found in database, skipping balance update")
+                    results[address] = {"success": False, "error": "Wallet not in database"}
+                    continue
+                
+                # Lấy số dư từ blockchain
+                balance = self.blockchain.get_balance(address)
+                
+                # Chỉ cập nhật nếu số dư thay đổi
+                if abs(float(balance) - float(wallet.get("balance", 0))) > 0.0001:
+                    # Cập nhật vào database
+                    cursor = self.db.cursor()
+                    cursor.execute(
+                        "UPDATE wallets SET balance = ? WHERE address = ?",
+                        (balance, address)
+                    )
+                    self.db.commit()
+                    
+                    logger.info(f"Updated balance for wallet {address}: {balance}")
+                    results[address] = {"success": True, "balance": balance, "updated": True}
+                else:
+                    logger.info(f"Balance unchanged for wallet {address}: {balance}")
+                    results[address] = {"success": True, "balance": balance, "updated": False}
+                    
+            except Exception as e:
+                logger.error(f"Error updating balance for wallet {address}: {str(e)}")
+                results[address] = {"success": False, "error": str(e)}
+        
+        return results
     
-    def create_transaction(self, transaction_data: Dict[str, Any]) -> int:
+    
+    def save_transaction_history(self, transaction_data: Dict[str, Any]) -> int:
         """Tạo giao dịch mới và trả về ID của giao dịch"""
         try:
             logger.info(f"Creating new transaction with data: {transaction_data}")
@@ -409,13 +596,29 @@ class WalletRepository:
             timestamp = transaction_data.get("timestamp", datetime.now().isoformat())
             tx_type = transaction_data.get("type", "transfer")
             status = transaction_data.get("status", "success")
+            tx_hash = transaction_data.get("hash")
+            block_number = transaction_data.get("block_number")
             
-            # Thêm vào database
+            # Kiểm tra các cột có tồn tại không
             cursor = self.db.cursor()
-            cursor.execute(
-                "INSERT INTO transactions (from_wallet, to_wallet, amount, timestamp, type, status) VALUES (?, ?, ?, ?, ?, ?)",
-                (from_wallet, to_wallet, amount, timestamp, tx_type, status)
-            )
+            cursor.execute("PRAGMA table_info(transactions)")
+            columns = [col[1] for col in cursor.fetchall()]
+            
+            if "hash" in columns and "block_number" in columns:
+                cursor.execute(
+                    """INSERT INTO transactions 
+                    (from_wallet, to_wallet, amount, timestamp, type, status, hash, block_number) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (from_wallet, to_wallet, amount, timestamp, tx_type, status, tx_hash, block_number)
+                )
+            else:
+                cursor.execute(
+                    """INSERT INTO transactions 
+                    (from_wallet, to_wallet, amount, timestamp, type, status) 
+                    VALUES (?, ?, ?, ?, ?, ?)""",
+                    (from_wallet, to_wallet, amount, timestamp, tx_type, status)
+                )
+            
             self.db.commit()
             
             # Lấy ID của giao dịch vừa tạo
@@ -428,63 +631,113 @@ class WalletRepository:
             return None
 
     @staticmethod
-    async def get_all_wallets_by_user_id(conn: Connection, user_id: int):
+    def get_transactions_by_wallet(conn: Connection, wallet_address: str) -> List[Dict]:
+        """Lấy tất cả giao dịch liên quan đến một địa chỉ ví"""
+        cursor = conn.cursor()
         try:
-            cursor = conn.cursor()
+            # Tìm tất cả giao dịch mà địa chỉ ví là người gửi hoặc người nhận
+            cursor.execute("""
+                SELECT id, from_wallet, to_wallet, amount, type, hash, created_at 
+                FROM transactions 
+                WHERE from_wallet = ? OR to_wallet = ?
+                ORDER BY created_at DESC
+            """, (wallet_address, wallet_address))
             
-            # In ra câu lệnh SQL để debug
-            print("Checking table structure before query...")
-            cursor.execute("PRAGMA table_info(wallets)")
-            columns = cursor.fetchall()
-            print(f"Table columns: {columns}")
+            transactions = cursor.fetchall()
             
-            cursor.execute("SELECT * FROM wallets WHERE user_id = ? ORDER BY created_at DESC", (user_id,))
-            wallet_data = cursor.fetchall()
+            # Chuyển đổi kết quả thành list of dictionaries
+            result = []
+            for tx in transactions:
+                result.append({
+                    "id": tx["id"],
+                    "from_wallet": tx["from_wallet"],
+                    "to_wallet": tx["to_wallet"],
+                    "amount": tx["amount"],
+                    "type": tx["type"],
+                    "hash": tx["hash"],
+                    "created_at": tx["created_at"]
+                })
             
-            print(f"Raw wallet data: {wallet_data}")
-            
-            wallets = []
-            for data in wallet_data:
-                try:
-                    # Tạo dictionary từ dữ liệu wallet theo cấu trúc thực tế
-                    # id | address | private_key | user_id | balance | created_at
-                    wallet_dict = {
-                        "id": data[0],
-                        "address": data[1],
-                        "private_key": data[2],
-                        "user_id": data[3],
-                        "balance": float(data[4]) if data[4] is not None else 0.0,
-                        "created_at": data[5]
-                    }
-                    wallets.append(wallet_dict)
-                except Exception as e:
-                    print(f"Error processing wallet data: {e}")
-                    print(f"Problematic data: {data}")
-            
-            return wallets
+            return result
         except Exception as e:
-            print(f"Error fetching wallets by user_id: {e}")
+            print(f"Error fetching transactions for wallet {wallet_address}: {e}")
             return []
+        finally:
+            cursor.close()
 
-    @staticmethod
-    async def get_wallet_by_user_id(conn: Connection, user_id: int) -> Optional[Wallet]:
-        try:
-            cursor = conn.cursor()
-            cursor.execute("SELECT * FROM wallets WHERE user_id = ?", (user_id,))
-            wallet_data = cursor.fetchone()
+    
+    # def export_wallet_data(self, wallet_address: str) -> Dict[str, Any]:
+    #     """
+    #     Xuất toàn bộ dữ liệu của wallet bao gồm thông tin wallet và lịch sử giao dịch
+        
+    #     Args:
+    #         wallet_address (str): Địa chỉ ví để export
+        
+    #     Returns:
+    #         Dict chứa thông tin chi tiết của wallet
+    #     """
+    #     try:
+    #         # Lấy thông tin wallet 
+    #         wallet = self.get_wallet_by_address(wallet_address)
             
-            if wallet_data:
-                # Ensure private_key is converted to string
-                private_key = str(wallet_data[3]) if wallet_data[3] is not None else ""
-                return Wallet(
-                    id=wallet_data[0],
-                    address=wallet_data[1],
-                    balance=Decimal(str(wallet_data[2] or '0.00')),
-                    private_key=private_key,  # Convert to string
-                    user_id=wallet_data[4],
-                    created_at=wallet_data[5]
-                )
-            return None
-        except Exception as e:
-            print(f"Error fetching wallet by user_id: {e}")
-            return None
+    #         if not wallet:
+    #             return None
+            
+    #         # Lấy lịch sử giao dịch 
+    #         transactions = self.get_transactions_by_wallet(self.db, wallet_address)
+            
+    #         # Chuẩn bị dữ liệu export
+    #         export_data = {
+    #             "wallet": {
+    #                 "id": wallet.get("id"),
+    #                 "user_id": wallet.get("user_id"),
+    #                 "address": wallet.get("address"),
+    #                 "label": wallet.get("label"),
+    #                 "balance": wallet.get("balance"),
+    #                 "created_at": wallet.get("created_at")
+    #             },
+    #             "transactions": transactions,
+    #             "blockchain_info": {
+    #                 "network": self.blockchain.blockchain_url,  # Giả định có thuộc tính này trong BlockchainService
+    #                 "exported_at": datetime.now().isoformat()
+    #             }
+    #         }
+            
+    #         return export_data
+        
+    #     except Exception as e:
+    #         logger.error(f"Error exporting wallet data: {str(e)}")
+    #         return None
+
+    # @staticmethod
+    # async def get_all_wallets_by_user_id(conn: Connection, user_id: int):
+    #     try:
+    #         cursor = conn.cursor()
+            
+    #         cursor.execute("""
+    #             SELECT id, user_id, address, private_key, label, balance, created_at 
+    #             FROM wallets WHERE user_id = ? ORDER BY created_at DESC
+    #         """, (user_id,))
+    #         wallet_data = cursor.fetchall()
+            
+    #         wallets = []
+    #         for data in wallet_data:
+    #             try:
+    #                 wallet_dict = {
+    #                     "id": data[0],
+    #                     "user_id": data[1],
+    #                     "address": data[2],
+    #                     "private_key": data[3],
+    #                     "label": data[4],
+    #                     "balance": float(data[5]) if data[5] is not None else 0.0,
+    #                     "created_at": data[6]
+    #                 }
+    #                 wallets.append(wallet_dict)
+    #             except Exception as e:
+    #                 print(f"Error processing wallet data: {e}")
+    #                 print(f"Problematic data: {data}")
+            
+    #         return wallets
+    #     except Exception as e:
+    #         print(f"Error fetching wallets by user_id: {e}")
+    #         return []

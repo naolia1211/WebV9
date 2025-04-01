@@ -1,4 +1,5 @@
 console.log('Script loaded'); // Kiểm tra script có được load không
+const baseUrl = 'http://localhost:8000'
 
 // Kiểm tra nếu đã đăng nhập thì chuyển hướng
 if (localStorage.getItem('access_token') && localStorage.getItem('user_info')) {
@@ -58,7 +59,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         try {
             console.log('Sending registration request...');
-            const response = await fetch('http://localhost:8000/api/auth/register', {
+            const response = await fetch(`${baseUrl}/api/auth/register`, {
                 method: 'POST',
                 body: formData
             });

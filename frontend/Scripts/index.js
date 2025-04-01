@@ -1,7 +1,9 @@
+const baseUrl = 'http://localhost:8000'
+
 document.addEventListener('DOMContentLoaded', async () => {
     // Set initial opacity
     document.body.style.opacity = '0';
-    document.body.style.transition = 'opacity 0.3s';
+    document.body.style.transition = 'opacity 0.1s';
     
     const accessToken = localStorage.getItem('access_token');
     
@@ -11,6 +13,96 @@ document.addEventListener('DOMContentLoaded', async () => {
         return;
     }
     
+    // Xử lý form deposit
+    const depositForm = document.getElementById('depositForm');
+    if (depositForm) {
+        depositForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const walletAddress = document.getElementById('depositWallet').value;
+            const amount = document.getElementById('depositAmount').value;
+            const privatePassword = document.getElementById('depositPrivatePassword').value;
+
+            if (!walletAddress || !amount) {
+                alert('Please fill in all required fields');
+                return;
+            }
+            
+            // Kiểm tra private password
+            const storedPrivatePassword = localStorage.getItem('private_password');
+            if (privatePassword !== storedPrivatePassword) {
+                alert('Incorrect private password');
+                return;
+            }
+
+            // Hiển thị loading
+            const submitButton = depositForm.querySelector('button[type="submit"]');
+            const originalText = submitButton.innerHTML;
+            submitButton.disabled = true;
+            submitButton.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Processing...';
+            
+            console.log('Attempting to deposit', {
+                wallet_address: walletAddress,
+                amount: parseFloat(amount)
+            });
+            
+            // Thực hiện nạp tiền
+            fetch(`${baseUrl}/api/wallets/deposit`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+                },
+                body: JSON.stringify({
+                    wallet_address: walletAddress,
+                    amount: parseFloat(amount)
+                })
+            })
+            .then(response => {
+                console.log('Deposit response status:', response.status);
+                return response.json();
+            })
+            .then(result => {
+                console.log('Deposit result:', result);
+                
+                // Khôi phục nút submit
+                submitButton.disabled = false;
+                submitButton.innerHTML = originalText;
+                
+                if (result.status === 'success') {
+                    // Thông báo thành công
+                    alert(`Deposit completed successfully!\nTransaction hash: ${result.transaction_hash || result.hash || ''}`);
+                    
+                    // Đóng modal
+                    const modal = document.getElementById('depositModal');
+                    if (modal) {
+                        const bsModal = bootstrap.Modal.getInstance(modal);
+                        if (bsModal) bsModal.hide();
+                    }
+                    
+                    // Reset form
+                    depositForm.reset();
+                    
+                    // Refresh dữ liệu
+                    loadWallets();
+                } else {
+                    // Thông báo lỗi
+                    alert(`Deposit failed: ${result.message}`);
+                }
+            })
+            .catch(error => {
+                console.error('Deposit error:', error);
+                
+                // Khôi phục nút submit
+                submitButton.disabled = false;
+                submitButton.innerHTML = originalText;
+                
+                // Thông báo lỗi
+                alert(`Error: ${error.message}`);
+            });
+        });
+    }
+
     // Parse user info with better error handling
     const userInfo = (() => {
         try {
@@ -87,7 +179,6 @@ function updateUserInfo() {
     
     // Cập nhật ảnh đại diện
     if (userInfo.profileImage) {
-        const baseUrl = 'http://127.0.0.1:8000';
         
         let imagePath = userInfo.profileImage;
         if (!imagePath.startsWith('/') && !imagePath.startsWith('http')) {
@@ -153,7 +244,7 @@ function loadWallets() {
         walletList.innerHTML = '<tr><td colspan="5" class="text-center">Đang tải danh sách ví...</td></tr>';
     }
     
-    const apiUrl = `http://127.0.0.1:8000/api/wallets/user/${userInfo.id}`;
+    const apiUrl = `${baseUrl}/api/wallets/user/${userInfo.id}`;
     console.log('Fetching from URL:', apiUrl);
     
     return fetch(apiUrl, {
@@ -445,7 +536,7 @@ function loadTransactions() {
     tbody.innerHTML = '<tr><td colspan="6" class="text-center">Đang tải giao dịch...</td></tr>';
     
     // Lấy danh sách ví của người dùng - sửa đường dẫn API
-    return fetch(`http://127.0.0.1:8000/api/wallets/user/${userInfo.id}`, {
+    return fetch(`${baseUrl}/api/wallets/user/${userInfo.id}`, {
         method: 'GET',
             headers: {
             'Authorization': `Bearer ${accessToken}`,
@@ -474,7 +565,7 @@ function loadTransactions() {
         
         // Lấy giao dịch cho mỗi ví
         const promises = walletAddresses.map(address => 
-            fetch(`http://127.0.0.1:8000/api/transactions/${address}`, {
+            fetch(`${baseUrl}/api/transactions/${address}`, {
                 method: 'GET',
                 headers: {
                     'Authorization': `Bearer ${accessToken}`,
@@ -623,7 +714,7 @@ function updateWalletDropdowns() {
     // Nếu chưa có dữ liệu trong bộ nhớ đệm, tải mới
     console.log('No cached wallets, loading from API');
     
-    const apiUrl = `http://127.0.0.1:8000/api/wallets/user/${userInfo.id}`;
+    const apiUrl = `${baseUrl}/api/wallets/user/${userInfo.id}`;
     console.log('Fetching from URL:', apiUrl);
     
     fetch(apiUrl, {
@@ -677,92 +768,68 @@ function updateWalletDropdowns() {
 
 // Điền dữ liệu vào các dropdown
 function populateWalletDropdowns(data) {
-    console.log('Populating wallet dropdowns with data:', data);
+    console.log('Raw data for dropdowns:', data);
     
-    // Lấy tất cả các dropdown có class 'wallet-dropdown' hoặc các ID cụ thể
-    const dropdowns = document.querySelectorAll('.wallet-dropdown, #fromWallet, #toWallet, #depositWallet, #exportWallet');
+    // Đảm bảo mảng wallets tồn tại
+    const wallets = Array.isArray(data) ? data : 
+                  (data && Array.isArray(data.wallets) ? data.wallets : []);
     
-    if (!dropdowns || dropdowns.length === 0) {
-        console.log('No wallet dropdown elements found');
-        // Kiểm tra xem các phần tử có tồn tại không
-        console.log('Checking for specific dropdown elements:');
-        console.log('fromWallet exists:', !!document.getElementById('fromWallet'));
-        console.log('toWallet exists:', !!document.getElementById('toWallet'));
-        console.log('depositWallet exists:', !!document.getElementById('depositWallet'));
-        console.log('exportWallet exists:', !!document.getElementById('exportWallet'));
-        return;
-    }
+    console.log('Processed wallets array:', wallets);
     
-    console.log(`Found ${dropdowns.length} wallet dropdown elements`);
-    
-    // Kiểm tra dữ liệu đầu vào
-    if (!data) {
-        console.error('No data provided to populateWalletDropdowns');
-        dropdowns.forEach(dropdown => {
-            dropdown.innerHTML = '<option value="">Không có dữ liệu ví</option>';
-        });
-        return;
-    }
-    
-    // Kiểm tra cấu trúc dữ liệu
-    let walletArray = [];
-    
-    if (Array.isArray(data)) {
-        walletArray = data;
-    } else if (data.wallets && Array.isArray(data.wallets)) {
-        walletArray = data.wallets;
-    } else if (data.status === 'success' && data.wallet) {
-        // Trường hợp API trả về một ví duy nhất
-        walletArray = [data.wallet];
-    } else {
-        console.error('Unexpected data structure for wallet dropdowns:', data);
-        dropdowns.forEach(dropdown => {
-            dropdown.innerHTML = '<option value="">Cấu trúc dữ liệu không đúng</option>';
-        });
-        return;
-    }
-    
-    console.log(`Processing ${walletArray.length} wallets for dropdowns`);
-    
-    if (walletArray.length === 0) {
-        console.log('No wallets available for dropdowns');
-        dropdowns.forEach(dropdown => {
-            dropdown.innerHTML = '<option value="">Bạn chưa có ví nào</option>';
-        });
-        return;
-    }
-    
-    // Cập nhật từng dropdown
-    dropdowns.forEach((dropdown, index) => {
-        console.log(`Updating dropdown ${index}:`, dropdown.id || 'unnamed');
+    // Xử lý From Wallet trong transfer modal
+    const fromWalletSelect = document.getElementById('fromWallet');
+    if (fromWalletSelect) {
+        fromWalletSelect.innerHTML = '';
         
-        // Xóa các option cũ
-        dropdown.innerHTML = '';
-        
-        // Thêm option mặc định
-        const defaultOption = document.createElement('option');
-        defaultOption.value = '';
-        defaultOption.textContent = 'Chọn ví';
-        dropdown.appendChild(defaultOption);
-        
-        // Thêm các ví vào dropdown
-        walletArray.forEach((wallet, walletIndex) => {
-            try {
-                if (!wallet) {
-                    console.error(`Wallet at index ${walletIndex} is null or undefined`);
-                    return;
+        if (wallets.length === 0) {
+            const option = document.createElement('option');
+            option.value = '';
+            option.textContent = 'No wallets available';
+            option.disabled = true;
+            option.selected = true;
+            fromWalletSelect.appendChild(option);
+        } else {
+            wallets.forEach(wallet => {
+                if (wallet && wallet.address) {
+                    const option = document.createElement('option');
+                    option.value = wallet.address;
+                    // Định dạng số để hiển thị tối đa 4 chữ số thập phân
+                    const balance = parseFloat(wallet.balance || 0).toFixed(4);
+                    // Rút gọn địa chỉ ví để hiển thị
+                    const shortAddress = wallet.address.substring(0, 8) + '...';
+                    option.textContent = `${wallet.label || 'Wallet'} (${balance} ETH) - ${shortAddress}`;
+                    fromWalletSelect.appendChild(option);
                 }
-                
-                const option = document.createElement('option');
-                option.value = wallet.address || '';
-                option.textContent = `${wallet.label || 'My Wallet'} (${wallet.balance || 0} ETH)`;
-                dropdown.appendChild(option);
-    } catch (error) {
-                console.error(`Error adding wallet ${walletIndex} to dropdown ${index}:`, error);
-            }
-        });
-    });
-    
+            });
+        }
+    }
+    // THÊM Ở ĐÂY: Xử lý Deposit Wallet dropdown
+    const depositWalletSelect = document.getElementById('depositWallet');
+    if (depositWalletSelect) {
+        depositWalletSelect.innerHTML = '';
+        
+        if (wallets.length === 0) {
+            const option = document.createElement('option');
+            option.value = '';
+            option.textContent = 'No wallets available';
+            option.disabled = true;
+            option.selected = true;
+            depositWalletSelect.appendChild(option);
+        } else {
+            wallets.forEach(wallet => {
+                if (wallet && wallet.address) {
+                    const option = document.createElement('option');
+                    option.value = wallet.address;
+                    // Định dạng số để hiển thị tối đa 4 chữ số thập phân
+                    const balance = parseFloat(wallet.balance || 0).toFixed(4);
+                    // Rút gọn địa chỉ ví để hiển thị
+                    const shortAddress = wallet.address.substring(0, 8) + '...';
+                    option.textContent = `${wallet.label || 'Wallet'} (${balance} ETH) - ${shortAddress}`;
+                    depositWalletSelect.appendChild(option);
+                }
+            });
+        }
+    }
     console.log('Wallet dropdowns populated successfully');
 }
 
@@ -780,7 +847,7 @@ function createWallet() {
     }
    
     // Lấy tên ví từ form - kiểm tra element tồn tại
-    // Sửa từ newWalletLabel thành walletLabel theo HTML
+    
     const walletLabelElement = document.getElementById('walletLabel');
     const walletLabel = walletLabelElement && walletLabelElement.value.trim() !== ''
         ? walletLabelElement.value.trim()
@@ -804,7 +871,7 @@ function createWallet() {
     });
    
     // Gửi yêu cầu tạo ví mới
-    fetch('http://127.0.0.1:8000/api/wallets/', {
+    fetch(`${baseUrl}/api/wallets/create`, {
         method: 'POST',
         headers: {
             'Authorization': `Bearer ${accessToken}`,
@@ -816,6 +883,7 @@ function createWallet() {
         })
     })
     .then(response => {
+        debugger;
         console.log('Create wallet response status:', response.status);
         if (!response.ok) {
             return response.json().then(data => {
@@ -872,101 +940,39 @@ function createWallet() {
     });
 }
 
-// Handle Change Password
-document.getElementById('changePasswordForm')?.addEventListener('submit', async function(e) {
-    e.preventDefault();
-    const currentPassword = document.getElementById('currentPassword').value;
-    const newPassword = document.getElementById('newPassword').value;
+// // Handle Change Password
+// document.getElementById('changePasswordForm')?.addEventListener('submit', async function(e) {
+//     e.preventDefault();
+//     const currentPassword = document.getElementById('currentPassword').value;
+//     const newPassword = document.getElementById('newPassword').value;
     
-    if (!currentPassword || !newPassword) return;
+//     if (!currentPassword || !newPassword) return;
     
-    try {
-        const response = await fetch('http://127.0.0.1:8000/api/auth/change-password', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${accessToken}`
-            },
-            body: JSON.stringify({
-                current_password: currentPassword,
-                new_password: newPassword
-            })
-        });
+//     try {
+//         const response = await fetch(`${baseUrl}/api/auth/change-password`, {
+//             method: 'POST',
+//             headers: {
+//                 'Content-Type': 'application/json',
+//                 'Authorization': `Bearer ${accessToken}`
+//             },
+//             body: JSON.stringify({
+//                 current_password: currentPassword,
+//                 new_password: newPassword
+//             })
+//         });
         
-        if (!response.ok) throw new Error('Failed to change password');
+//         if (!response.ok) throw new Error('Failed to change password');
         
-        bootstrap.Modal.getInstance(document.getElementById('changePasswordModal')).hide();
-        alert('Password changed successfully!');
+//         bootstrap.Modal.getInstance(document.getElementById('changePasswordModal')).hide();
+//         alert('Password changed successfully!');
         
-    } catch (error) {
-        console.error('Error changing password:', error);
-        alert('Failed to change password. Please try again.');
-    }
-});
+//     } catch (error) {
+//         console.error('Error changing password:', error);
+//         alert('Failed to change password. Please try again.');
+//     }
+// });
 
-// Handle Change Image form submission
-document.getElementById('changeImageForm').addEventListener('submit', function(e) {
-  e.preventDefault();
-    
-  const imageFile = document.getElementById('newImage').files[0];
-    console.log('Form submitted, selected file:', imageFile);
-    
-    if (!imageFile) {
-        alert('Please select an image file');
-        return;
-    }
 
-    const formData = new FormData();
-    formData.append('profile_image', imageFile);
-
-    fetch('http://127.0.0.1:8000/api/auth/change-image', {
-        method: 'PUT',
-        headers: {
-            'Authorization': `Bearer ${localStorage.getItem('access_token')}`
-        },
-        body: formData
-    })
-    .then(response => response.json())
-    .then(data => {
-        console.log('Success:', data);
-        if (data.status === 'success') {
-            // Update profile images in UI
-            const newImagePath = data.user.profileImage;
-            console.log('New image path from server:', newImagePath);
-
-            document.querySelectorAll('.profile-img').forEach(img => {
-                // Kiểm tra đường dẫn và xử lý phù hợp
-                if (newImagePath.startsWith('http')) {
-                    // Đường dẫn đã đầy đủ
-                    img.src = newImagePath;
-                } else if (newImagePath.startsWith('/')) {
-                    // Đường dẫn bắt đầu bằng /
-                    img.src = `http://127.0.0.1:8000${newImagePath}`;
-                } else {
-                    // Đường dẫn tương đối
-                    img.src = `http://127.0.0.1:8000/${newImagePath}`;
-                }
-                img.style.display = 'block';
-                console.log('Set profile image to:', img.src);
-            });
-            
-            // Store image path in localStorage
-            const userInfo = JSON.parse(localStorage.getItem('user_info'));
-            userInfo.profileImage = newImagePath;
-            localStorage.setItem('user_info', JSON.stringify(userInfo));
-            
-            // Close modal and clear form
-            $('#changeImageModal').modal('hide');
-            document.getElementById('newImage').value = '';
-    alert('Profile image updated successfully!');
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        alert('Failed to update profile image');
-    });
-
-});
 
 // Handle Logout
 function handleLogout() {
@@ -987,7 +993,7 @@ $('#changeNameForm').on('submit', function(e) {
 
     // 2. Gửi request lên server để update
     $.ajax({
-        url: 'http://127.0.0.1:8000/api/auth/change-name',
+        url: `${baseUrl}/api/auth/change-name`,
         method: 'PUT',
         headers: {
             'Content-Type': 'application/json',
@@ -1027,217 +1033,293 @@ $('#changeNameForm').on('submit', function(e) {
     });
 });
 
-// Handle change email form
-$('#changeEmailForm').on('submit', function(e) {
-    e.preventDefault();
-    
-    const newEmail = $('#newEmail').val();
-    const token = localStorage.getItem('access_token');
 
-    $.ajax({
-        url: 'http://127.0.0.1:8000/api/auth/change-email',
-        method: 'PUT',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-        },
-        data: JSON.stringify({
-            new_email: newEmail
-        }),
-        success: function(response) {
-            // Update localStorage
-            const userInfo = JSON.parse(localStorage.getItem('user_info'));
-            userInfo.email = newEmail;
-            localStorage.setItem('user_info', JSON.stringify(userInfo));
-            
-            // Update UI
-            document.getElementById('headerUserEmail').textContent = newEmail;
-            document.getElementById('settingsUserEmail').textContent = newEmail;
-            
-            // Close modal
-            $('#changeEmailModal').modal('hide');
-            alert('Email updated successfully!');
-        },
-        error: function(xhr) {
-            alert('Failed to update email');
-        }
-    });
-});
 
-// Handle Transfer Form
-document.getElementById('transferForm')?.addEventListener('submit', async function(e) {
-    e.preventDefault();
-    const fromWallet = document.getElementById('fromWallet').value;
-    const toWallet = document.getElementById('toWallet').value;
-    const amount = document.getElementById('transferAmount').value;
-    const token = localStorage.getItem('access_token');
+// Đảm bảo code được thực thi sau khi DOM đã tải xong
+document.addEventListener('DOMContentLoaded', function() {
+    // Khởi tạo modal (nếu sử dụng Bootstrap)
+    const changeImageModal = new bootstrap.Modal(document.getElementById('changeImageModal'));
     
-    // VULNERABILITY: No input validation for amount (allows negative values)
-    // VULNERABILITY: No confirmation of ownership for fromWallet
-    
-    console.log('Initiating transfer:', {
-        from: fromWallet,
-        to: toWallet,
-        amount: amount
-    });
-    
-    // VULNERABILITY: Direct use of user input in URL (potential for injection)
-    const transferUrl = 'http://127.0.0.1:8000/api/wallets/transfer?from=' + fromWallet + '&to=' + toWallet + '&amount=' + amount;
-    
-    try {
-        // VULNERABILITY: Using GET instead of POST for a state-changing operation
-        const response = await fetch(transferUrl, {
-            method: 'GET',
-            headers: {
-                'Authorization': `Bearer ${token}`
+    // Handle Change Image form submission
+    const changeImageForm = document.getElementById('changeImageForm');
+    if (changeImageForm) {
+        changeImageForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const imageFile = document.getElementById('newImage').files[0];
+            console.log('Form submitted, selected file:', imageFile);
+            
+            if (!imageFile) {
+                alert('Please select an image file');
+                return;
             }
+            
+            const formData = new FormData();
+            formData.append('profile_image', imageFile);
+            
+            fetch(`${baseUrl}/api/auth/change-image`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+                    // Không thêm Content-Type vào đây vì browser sẽ tự thêm khi sử dụng FormData
+                },
+                body: formData
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok: ' + response.status);
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('Success:', data);
+                if (data.status === 'success') {
+                    // Update profile images in UI
+                    const newImagePath = data.user.profileImage;
+                    console.log('New image path from server:', newImagePath);
+                    
+                    document.querySelectorAll('.profile-img').forEach(img => {
+                        // Kiểm tra đường dẫn và xử lý phù hợp
+                        if (newImagePath.startsWith('http')) {
+                            // Đường dẫn đã đầy đủ
+                            img.src = newImagePath;
+                        } else if (newImagePath.startsWith('/')) {
+                            // Đường dẫn bắt đầu bằng /
+                            img.src = `${baseUrl}${newImagePath}`;
+                        } else {
+                            // Đường dẫn tương đối
+                            img.src = `${baseUrl}/${newImagePath}`;
+                        }
+                        img.style.display = 'block';
+                        console.log('Set profile image to:', img.src);
+                    });
+                    
+                    // Store image path in localStorage
+                    try {
+                        const userInfo = JSON.parse(localStorage.getItem('user_info') || '{}');
+                        userInfo.profileImage = newImagePath;
+                        localStorage.setItem('user_info', JSON.stringify(userInfo));
+                    } catch (error) {
+                        console.error('Lỗi khi cập nhật localStorage:', error);
+                    }
+                    
+                    // Close modal and clear form
+                    $('#changeImageModal').modal('hide');
+                    document.getElementById('newImage').value = '';
+                    alert('Profile image updated successfully!');
+                } else {
+                    alert('Failed to update profile image: ' + (data.message || 'Unknown error'));
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Failed to update profile image: ' + error.message);
+            });
         });
-        
-        const result = await response.json();
-        console.log('Transfer result:', result);
-        
-        if (result.status === 'success') {
-            alert('Transfer completed successfully!');
-            
-            try {
-                const modal = bootstrap.Modal.getInstance(document.getElementById('transferModal'));
-                if (modal) modal.hide();
-            } catch (error) {
-                console.error('Error closing modal:', error);
-            }
-            
-            loadWallets();
-        } else {
-            // VULNERABILITY: Displaying raw error messages from the server
-            alert('Transfer failed: ' + result.message);
-        }
-    } catch (error) {
-        console.error('Error:', error);
-        alert('Error: ' + error.message);
+    } else {
+        console.error('Change image form not found in the document');
     }
 });
-
-// Handle Deposit Form
-document.getElementById('depositForm')?.addEventListener('submit', async function(e) {
-    e.preventDefault();
-    const walletAddress = document.getElementById('depositWallet').value;
-    const amount = document.getElementById('depositAmount').value;
-    const token = localStorage.getItem('access_token');
-    
-    // VULNERABILITY: No input validation for amount (allows any value)
-    // VULNERABILITY: No rate limiting (allows unlimited deposits)
-    
-    console.log('Initiating deposit:', {
-        wallet: walletAddress,
-        amount: amount
-    });
-    
-    try {
-        // VULNERABILITY: Using string concatenation for JSON (potential for JSON injection)
-        const requestBody = '{"wallet_address":"' + walletAddress + '","amount":' + amount + '}';
-        
-        const response = await fetch('http://127.0.0.1:8000/api/wallets/deposit', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
-            // VULNERABILITY: Using raw string instead of proper JSON.stringify
-            body: requestBody
-        });
-        
-        // VULNERABILITY: Not checking response status before parsing JSON
-        const result = await response.json();
-        console.log('Deposit result:', result);
-        
-        // VULNERABILITY: Trusting server response without validation
-        if (result.status === 'success' || result.status === 'pending') {
-            alert('Deposit completed successfully!');
-            
-            try {
-                const modal = bootstrap.Modal.getInstance(document.getElementById('depositModal'));
-                if (modal) modal.hide();
-            } catch (error) {
-                console.error('Error closing modal:', error);
+// Xử lý form transfer đơn giản và ổn định
+document.addEventListener('DOMContentLoaded', function() {
+    // Xử lý form transfer
+    const transferForm = document.getElementById('transferForm');
+    if (transferForm) {
+        transferForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+           
+            const fromWallet = document.getElementById('fromWallet').value;
+            const toWallet = document.getElementById('toWallet').value;
+            const amount = document.getElementById('transferAmount').value;
+            const transferPrivatePassword = document.getElementById('transferPrivatePassword').value;
+            const confirmTransfer = document.getElementById('confirmTransfer')?.checked || false;
+           
+            // Debug: Kiểm tra các giá trị
+            console.log('From Wallet:', fromWallet);
+            console.log('To Wallet:', toWallet);
+            console.log('Amount:', amount);
+            console.log('Transfer Private Password:', transferPrivatePassword);
+            console.log('Confirm Transfer:', confirmTransfer);
+           
+            if (!fromWallet || !toWallet || !amount) {
+                alert('Please fill in all required fields');
+                return;
             }
+           
+            if (!confirmTransfer) {
+                alert('Please confirm the transaction');
+                return;
+            }
+           
+            // Kiểm tra private password
+            const storedPrivatePassword = localStorage.getItem('private_password');
+            console.log('Stored Private Password:', storedPrivatePassword);
             
-            // VULNERABILITY: Not waiting for confirmation before updating UI
-            loadWallets();
-        } else {
-            // VULNERABILITY: Displaying raw error messages from the server
-            alert('Deposit failed: ' + result.message);
-        }
-    } catch (error) {
-        console.error('Error:', error);
-        alert('Error: ' + error.message);
+            if (transferPrivatePassword !== storedPrivatePassword) {
+                alert('Incorrect private password');
+                return;
+            }
+            // Hiển thị loading
+            const submitButton = transferForm.querySelector('button[type="submit"]');
+            const originalText = submitButton.innerHTML;
+            submitButton.disabled = true;
+            submitButton.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Processing...';
+            
+            // Thực hiện chuyển tiền
+            fetch('http://127.0.0.1:8000/api/wallets/transfer', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+                },
+                body: JSON.stringify({
+                    from_wallet: fromWallet,
+                    to_wallet: toWallet,
+                    amount: parseFloat(amount),
+                    confirm: true
+                })
+            })
+            .then(response => response.json())
+            .then(result => {
+                // Khôi phục nút submit
+                submitButton.disabled = false;
+                submitButton.innerHTML = originalText;
+                
+                if (result.status === 'success') {
+                    // Thông báo thành công
+                    alert(`Transfer completed successfully!\nTransaction hash: ${result.transaction_hash}`);
+                    
+                    // Đóng modal
+                    const modal = document.getElementById('transferModal');
+                    if (modal) {
+                        const bsModal = bootstrap.Modal.getInstance(modal);
+                        if (bsModal) bsModal.hide();
+                    }
+                    
+                    // Reset form
+                    transferForm.reset();
+                    
+                    // Refresh dữ liệu
+                    loadWallets();
+                } else {
+                    // Thông báo lỗi
+                    alert(`Transfer failed: ${result.message}`);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                
+                // Khôi phục nút submit
+                submitButton.disabled = false;
+                submitButton.innerHTML = originalText;
+                
+                // Thông báo lỗi
+                alert(`Error: ${error.message}`);
+            });
+        });
     }
+    
 });
 
 // Handle Search Form
-document.getElementById('searchForm')?.addEventListener('submit', async function(e) {
-    e.preventDefault();
-    const keyword = document.getElementById('searchKeyword').value;
-    const token = localStorage.getItem('access_token');
+document.addEventListener('DOMContentLoaded', function() {
+    const searchForm = document.getElementById('searchForm');
     
-    try {
-        const response = await fetch(`http://127.0.0.1:8000/api/transactions/wallet/${keyword}`, {
-            method: 'GET',
-            headers: {
-                'Authorization': `Bearer ${token}`
+    if (searchForm) {
+        searchForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            // Ngăn modal từ việc tự đóng
+            e.stopPropagation();
+            
+            const keyword = document.getElementById('searchKeyword').value.trim();
+            if (!keyword) {
+                alert('Please enter a wallet address to search');
+                return;
+            }
+            
+            const token = localStorage.getItem('access_token');
+            const resultsDiv = document.getElementById('searchResults');
+            
+            // Hiển thị trạng thái đang tìm kiếm
+            resultsDiv.innerHTML = '<div class="text-center"><div class="spinner-border text-primary" role="status"></div><p class="mt-2">Searching transactions...</p></div>';
+            
+            try {
+                const response = await fetch(`${baseUrl}/api/transactions/${keyword}`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Error: ${response.status} ${response.statusText}`);
+                }
+                
+                const results = await response.json();
+                console.log('Search results:', results);
+                
+                // Xóa trạng thái loading
+                resultsDiv.innerHTML = '';
+                
+                // Kiểm tra kết quả
+                if (!results || results.length === 0) {
+                    resultsDiv.innerHTML = '<div class="alert alert-info">No transactions found for this wallet address</div>';
+                    return;
+                }
+                
+                // Tạo bảng kết quả
+                const table = document.createElement('table');
+                table.className = 'table table-striped table-bordered mt-3';
+                
+                // Tạo header
+                const thead = document.createElement('thead');
+                thead.innerHTML = `
+                    <tr class="table-dark">
+                        <th>From</th>
+                        <th>To</th>
+                        <th>Amount</th>
+                        <th>Type</th>
+                        <th>Date</th>
+                    </tr>
+                `;
+                table.appendChild(thead);
+                
+                // Tạo body
+                const tbody = document.createElement('tbody');
+                results.forEach(tx => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${tx.from_wallet ? tx.from_wallet.substring(0,6) + '...' + tx.from_wallet.slice(-4) : 'N/A'}</td>
+                        <td>${tx.to_wallet ? tx.to_wallet.substring(0,6) + '...' + tx.to_wallet.slice(-4) : 'N/A'}</td>
+                        <td>${parseFloat(tx.amount).toFixed(4)} ETH</td>
+                        <td><span class="badge ${tx.type === 'deposit' ? 'bg-success' : tx.type === 'transfer' ? 'bg-primary' : 'bg-secondary'}">${tx.type || 'Unknown'}</span></td>
+                        <td>${tx.created_at ? new Date(tx.created_at).toLocaleString() : 'N/A'}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+                table.appendChild(tbody);
+                
+                // Thêm thông tin tổng số giao dịch
+                const resultSummary = document.createElement('div');
+                resultSummary.className = 'alert alert-success';
+                resultSummary.innerHTML = `Found <strong>${results.length}</strong> transaction(s) for wallet address <strong>${keyword}</strong>`;
+                
+                // Hiển thị kết quả
+                resultsDiv.appendChild(resultSummary);
+                resultsDiv.appendChild(table);
+                
+                // Đảm bảo modal vẫn mở
+                const searchModal = bootstrap.Modal.getInstance(document.getElementById('searchModal'));
+                if (!searchModal) {
+                    // Nếu modal chưa được khởi tạo, khởi tạo nó
+                    new bootstrap.Modal(document.getElementById('searchModal')).show();
+                }
+            } catch (error) {
+                console.error('Error searching transactions:', error);
+                resultsDiv.innerHTML = `<div class="alert alert-danger">Error searching transactions: ${error.message}</div>`;
             }
         });
-        
-        if (!response.ok) {
-            throw new Error(`Error: ${response.status}`);
-        }
-        
-        const results = await response.json();
-        console.log('Search results:', results);
-        
-        // Display results
-        const resultsDiv = document.getElementById('searchResults');
-        resultsDiv.innerHTML = '';
-        
-        if (results.length === 0) {
-            resultsDiv.innerHTML = '<p>No results found</p>';
-            return;
-        }
-        
-        const table = document.createElement('table');
-        table.className = 'table table-striped';
-        
-        // Create header
-        const thead = document.createElement('thead');
-        thead.innerHTML = `
-            <tr>
-                <th>From</th>
-                <th>To</th>
-                <th>Amount</th>
-                <th>Type</th>
-                <th>Date</th>
-            </tr>
-        `;
-        table.appendChild(thead);
-        
-        // Create body
-        const tbody = document.createElement('tbody');
-        results.forEach(tx => {
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td>${tx.from_wallet ? tx.from_wallet.substring(0,6) + '...' : 'N/A'}</td>
-                <td>${tx.to_wallet ? tx.to_wallet.substring(0,6) + '...' : 'N/A'}</td>
-                <td>${tx.amount} ETH</td>
-                <td>${tx.type}</td>
-                <td>${new Date(tx.created_at).toLocaleDateString()}</td>
-            `;
-            tbody.appendChild(tr);
-        });
-        table.appendChild(tbody);
-        
-        resultsDiv.appendChild(table);
-    } catch (error) {
-        console.error('Error:', error);
-        document.getElementById('searchResults').innerHTML = '<p class="text-danger">Error searching transactions: ' + error.message + '</p>';
     }
 });
 
@@ -1249,7 +1331,7 @@ document.getElementById('exportForm')?.addEventListener('submit', async function
     const token = localStorage.getItem('access_token');
     
     try {
-        const response = await fetch(`http://127.0.0.1:8000/api/wallets/export?wallet_address=${walletAddress}&format=${format}`, {
+        const response = await fetch(`${baseUrl}/api/wallets/export?wallet_address=${walletAddress}&format=${format}`, {
             method: 'GET',
             headers: {
                 'Authorization': `Bearer ${token}`
@@ -1271,45 +1353,7 @@ document.getElementById('exportForm')?.addEventListener('submit', async function
     }
 });
 
-// Handle Import Form
-document.getElementById('importForm')?.addEventListener('submit', async function(e) {
-    e.preventDefault();
-    const fileInput = document.getElementById('importFile');
-    const file = fileInput.files[0];
-    const token = localStorage.getItem('access_token');
-    
-    if (!file) {
-        alert('Please select a file');
-        return;
-    }
-    
-    const formData = new FormData();
-    formData.append('file', file);
-    
-    try {
-        const response = await fetch('http://127.0.0.1:8000/api/wallets/import', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${token}`
-            },
-            body: formData
-        });
-        
-        const result = await response.json();
-        console.log('Import result:', result);
-        
-        if (result.status === 'success') {
-            alert('Wallet imported successfully!');
-            bootstrap.Modal.getInstance(document.getElementById('importModal')).hide();
-            loadWallets();
-        } else {
-            alert('Import failed: ' + result.message);
-        }
-    } catch (error) {
-        console.error('Error:', error);
-        alert('Error: ' + error.message);
-    }
-});
+
 
 // Handle Reveal Wallet
 document.getElementById('revealWalletForm')?.addEventListener('submit', async function(e) {
@@ -1336,7 +1380,7 @@ document.getElementById('revealWalletForm')?.addEventListener('submit', async fu
     
     try {
         // Gửi request không có private_password vì backend chưa hỗ trợ
-        const response = await fetch('http://127.0.0.1:8000/api/wallets/reveal', {
+        const response = await fetch(`${baseUrl}/api/wallets/reveal`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -1421,7 +1465,7 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Ngược lại, gọi hàm tạo ví
             e.preventDefault();
-            createWallet();
+            // createWallet();
         });
     }
     
@@ -1466,7 +1510,7 @@ function deleteWallet(walletId) {
     }
     
     // Gửi yêu cầu xóa ví
-    fetch(`http://127.0.0.1:8000/api/wallets/${walletId}`, {
+    fetch(`${baseUrl}/api/wallets/${walletId}`, {
         method: 'DELETE',
         headers: {
             'Authorization': `Bearer ${accessToken}`,
@@ -1512,7 +1556,7 @@ function revealWallet(walletAddress) {
     }
     
     // Gửi yêu cầu lấy thông tin ví
-    fetch(`http://127.0.0.1:8000/api/wallets/address/${walletAddress}`, {
+    fetch(`${baseUrl}/api/wallets/address/${walletAddress}`, {
         method: 'GET',
         headers: {
             'Authorization': `Bearer ${accessToken}`,
@@ -1582,9 +1626,9 @@ function checkLogin() {
             if (userInfo.profileImage.startsWith('http')) {
                 userAvatarElement.src = userInfo.profileImage;
             } else if (userInfo.profileImage.startsWith('/')) {
-                userAvatarElement.src = `http://127.0.0.1:8000${userInfo.profileImage}`;
+                userAvatarElement.src = `${baseUrl}${userInfo.profileImage}`;
             } else {
-                userAvatarElement.src = `http://127.0.0.1:8000/${userInfo.profileImage}`;
+                userAvatarElement.src = `${baseUrl}/${userInfo.profileImage}`;
             }
             userAvatarElement.style.display = 'block';
             console.log('Set avatar in checkLogin to:', userAvatarElement.src);
@@ -1699,15 +1743,6 @@ function initializePage() {
         logoutBtn.addEventListener('click', logout);
     }
     
-    // Thiết lập sự kiện cho form tạo ví
-    const createWalletForm = document.getElementById('createWalletForm');
-    if (createWalletForm) {
-        createWalletForm.addEventListener('submit', function(e) {
-            e.preventDefault();
-            createWallet();
-        });
-    }
-    
     // Thiết lập sự kiện cho nút tạo ví
     const createWalletBtn = document.getElementById('createWalletBtn');
     if (createWalletBtn) {
@@ -1729,7 +1764,18 @@ function initializePage() {
             });
         });
     }
-}
+
+};
 
 // Chạy khởi tạo khi trang đã tải xong
 document.addEventListener('DOMContentLoaded', initializePage);
+
+// Thêm hoặc duy trì các hàm này
+function getUserInfo() {
+    const userInfo = localStorage.getItem('user_info');
+    return userInfo ? JSON.parse(userInfo) : {};
+}
+
+function getAccessToken() {
+    return localStorage.getItem('access_token');
+}
