@@ -5,23 +5,23 @@ from blockchain_service import BlockchainService
 import logging
 from datetime import datetime
 
-# Thiết lập logging
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class TransactionRepository:
     def __init__(self, db: Connection):
         self.db = db
-        # Thêm blockchain service
+       
         self.blockchain = BlockchainService()
         self._ensure_table_exists()
         
     def _ensure_table_exists(self):
-        """Đảm bảo bảng transactions tồn tại với cấu trúc đúng"""
+       
         try:
             cursor = self.db.cursor()
             
-            # Kiểm tra bảng transactions có tồn tại không
+           
             cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='transactions'")
             if not cursor.fetchone():
                 logger.info("Creating transactions table")
@@ -41,7 +41,7 @@ class TransactionRepository:
                 self.db.commit()
                 logger.info("Created transactions table")
             else:
-                # Kiểm tra và thêm cột hash và block_number nếu chưa có
+             
                 cursor.execute("PRAGMA table_info(transactions)")
                 columns = [col[1] for col in cursor.fetchall()]
                 
@@ -59,7 +59,7 @@ class TransactionRepository:
             raise
 
     def create_transaction(self, transaction: TransactionCreate) -> Optional[Transaction]:
-        """Tạo giao dịch mới"""
+      
         cursor = self.db.cursor()
         try:
             cursor.execute(
@@ -81,16 +81,16 @@ class TransactionRepository:
             return None
 
     def create_blockchain_transaction(self, from_wallet: str, to_wallet: str, amount: float, private_key: str) -> Dict[str, Any]:
-        """Tạo giao dịch mới trên blockchain"""
+       
         try:
-            # Thực hiện giao dịch trên blockchain
+          
             result = self.blockchain.send_transaction(from_wallet, to_wallet, amount, private_key)
             
             if result.get("status") == "failed":
                 logger.error(f"Failed to send transaction: {result.get('error')}")
                 return {"status": "error", "message": result.get("error")}
             
-            # Lưu giao dịch vào database
+          
             cursor = self.db.cursor()
             cursor.execute(
                 """INSERT INTO transactions 
@@ -109,10 +109,10 @@ class TransactionRepository:
             )
             self.db.commit()
             
-            # Lấy ID của giao dịch vừa tạo
+        
             transaction_id = cursor.lastrowid
             
-            # Thêm ID vào result
+       
             result["id"] = transaction_id
             
             return {"status": "success", "transaction": result}
@@ -121,7 +121,7 @@ class TransactionRepository:
             return {"status": "error", "message": str(e)}
 
     def get_transaction_by_id(self, transaction_id: int) -> Optional[Transaction]:
-        """Lấy giao dịch theo ID"""
+   
         cursor = self.db.cursor()
         cursor.execute(
             """SELECT id, from_wallet, to_wallet, amount, type, status, timestamp, hash, block_number 
@@ -144,19 +144,19 @@ class TransactionRepository:
         return None
 
     def get_transactions_by_address(self, address: str, limit: int = 50) -> List[Dict[str, Any]]:
-        """Lấy giao dịch theo địa chỉ wallet từ blockchain và database"""
+     
         try:
-            # Lấy giao dịch từ blockchain
+   
             blockchain_txs = self.blockchain.get_transaction_history(address, limit)
             
-            # Lưu và đồng bộ giao dịch từ blockchain vào database
+       
             for tx in blockchain_txs:
-                # Kiểm tra xem giao dịch đã tồn tại trong database chưa
+         
                 cursor = self.db.cursor()
                 cursor.execute("SELECT id FROM transactions WHERE hash = ?", (tx["hash"],))
                 
                 if not cursor.fetchone():
-                    # Lưu giao dịch mới vào database
+             
                     cursor.execute(
                         """INSERT INTO transactions 
                         (from_wallet, to_wallet, amount, timestamp, type, status, hash, block_number) 
@@ -174,7 +174,7 @@ class TransactionRepository:
                     )
                     self.db.commit()
             
-            # Lấy giao dịch từ database (để có thêm metadata và dễ truy vấn)
+           
             cursor = self.db.cursor()
             cursor.execute(
                 """SELECT id, from_wallet, to_wallet, amount, timestamp, type, status, hash, block_number 

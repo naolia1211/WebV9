@@ -13,14 +13,15 @@ from API.Routes.auth import get_current_user
 import logging
 import time
 
-# Thiết lập logging
+
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
-# Tạo ví mới (tạo ví ngẫu nhiên, không import từ Ganache)
+
 @router.post("/create", response_model=Dict[str, Any])
 async def create_wallet(
     wallet_data: WalletCreate = Body(...),
@@ -37,7 +38,7 @@ async def create_wallet(
             
         wallet_repo = WalletRepository(db)
         
-        # Tạo ví mới - sử dụng hàm create_wallet có sẵn
+        
         wallet_id = wallet_repo.create_wallet({
             "user_id": wallet_data.user_id,
             "label": wallet_data.label or "New Wallet"
@@ -46,7 +47,7 @@ async def create_wallet(
         if not wallet_id:
             return {"status": "error", "message": "Failed to create wallet"}
             
-        # Lấy thông tin ví vừa tạo
+       
         wallet = wallet_repo.get_wallet_by_id(wallet_id)
         return {
             "status": "success",
@@ -57,7 +58,7 @@ async def create_wallet(
         logger.error(f"Error creating wallet: {str(e)}")
         return {"status": "error", "message": f"Failed to create wallet: {str(e)}"}
 
-# Lấy danh sách ví của user
+
 @router.get("/user/{user_id}", response_model=Dict[str, Any])
 async def get_user_wallets(
     user_id: int,
@@ -76,7 +77,7 @@ async def get_user_wallets(
         logger.error(f"Error getting user wallets: {str(e)}")
         return {"status": "error", "message": "Failed to get wallets", "wallets": []}
 
-# Lấy thông tin ví theo ID
+
 @router.get("/{wallet_id}", response_model=Dict[str, Any])
 async def get_wallet(
     wallet_id: int,
@@ -98,7 +99,6 @@ async def get_wallet(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error getting wallet: {str(e)}")
 
-# Xóa ví
 @router.delete("/{wallet_id}", response_model=Dict[str, Any])
 async def delete_wallet(
     wallet_id: int,
@@ -111,8 +111,10 @@ async def delete_wallet(
         
         if not wallet:
             raise HTTPException(status_code=404, detail="Wallet not found")
-        if wallet["user_id"] != current_user.id:
-            raise HTTPException(status_code=403, detail="Unauthorized: you do not own this wallet")
+        
+        # BỎ KIỂM TRA QUYỀN SỞ HỮU ĐỂ TẠO LỖ HỔNG A01
+        # if wallet["user_id"] != current_user.id:
+        #     raise HTTPException(status_code=403, detail="Unauthorized: you do not own this wallet")
         
         success = wallet_repo.delete_wallet(wallet_id)
         if not success:
@@ -124,7 +126,7 @@ async def delete_wallet(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error deleting wallet: {str(e)}")
 
-# Lấy thông tin ví theo địa chỉ
+
 @router.get("/address/{address}", response_model=dict)
 async def get_wallet_by_address(
     address: str,
@@ -145,8 +147,7 @@ async def get_wallet_by_address(
         raise e
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
-
-# Reveal private key
+    
 @router.post("/reveal", response_model=dict)
 async def reveal_wallet(
     wallet_data: Dict[str, Any] = Body(...),
@@ -163,7 +164,19 @@ async def reveal_wallet(
         
         if not wallet:
             raise HTTPException(status_code=404, detail="Wallet not found")
-        if wallet["user_id"] != current_user.id:
+        
+        
+        user_has_access = False
+      
+        if wallet["user_id"] == current_user.id:
+            user_has_access = True
+        else:
+        
+            shared_with = wallet_data.get("shared_with", [])
+            if current_user.email in shared_with:
+                user_has_access = True
+        
+        if not user_has_access:
             raise HTTPException(status_code=403, detail="Unauthorized: you do not own this wallet")
         
         return {
@@ -177,7 +190,7 @@ async def reveal_wallet(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
-# Nạp tiền vào ví (từ ví Ganache)
+
 @router.post("/deposit", response_model=dict)
 async def deposit_money(
     deposit_data: Dict[str, Any] = Body(...),
@@ -200,24 +213,24 @@ async def deposit_money(
             logger.error(f"API: Invalid amount {amount}")
             return {"status": "error", "message": "amount must be greater than 0"}
         
-        # Khởi tạo WalletRepository
+     
         wallet_repo = WalletRepository(db)
         
-        # Kiểm tra cấu hình blockchain
+
         logger.info(f"API: Blockchain URL: {wallet_repo.blockchain.blockchain_url}")
         logger.info(f"API: Web3 provider: {wallet_repo.blockchain.w3.provider}")
         
-        # Kiểm tra định dạng địa chỉ ví
+
         if not wallet_repo.blockchain.is_valid_eth_address(wallet_address):
             logger.error(f"API: Invalid Ethereum address format: {wallet_address}")
             return {"status": "error", "message": "Invalid Ethereum wallet address format"}
         
-        # Kiểm tra kết nối blockchain
+   
         if not wallet_repo.blockchain.w3.is_connected():
             logger.error("API: Blockchain connection error - not connected to Ganache")
             return {"status": "error", "message": "Cannot connect to blockchain node (Ganache). Please verify that Ganache is running."}
             
-        # Kiểm tra tài khoản Ganache
+      
         try:
             accounts = wallet_repo.blockchain.w3.eth.accounts
             logger.info(f"API: Found {len(accounts)} accounts in Ganache")
@@ -226,7 +239,7 @@ async def deposit_money(
                 logger.error("API: No accounts found in Ganache")
                 return {"status": "error", "message": "No accounts found in Ganache. Please check your Ganache configuration."}
                 
-            # Log một số tài khoản đầu tiên để debug
+         
             for idx, account in enumerate(accounts[:3]):
                 balance = wallet_repo.blockchain.w3.eth.get_balance(account)
                 balance_eth = wallet_repo.blockchain.w3.from_wei(balance, "ether")
@@ -235,7 +248,7 @@ async def deposit_money(
             logger.error(f"API: Error accessing Ganache accounts: {str(acc_error)}")
             return {"status": "error", "message": f"Error accessing Ganache accounts: {str(acc_error)}"}
         
-        # Kiểm tra ví trong database
+      
         logger.info(f"API: Checking wallet {wallet_address} in database")
         wallet = wallet_repo.get_wallet_by_address(wallet_address)
         
@@ -247,7 +260,7 @@ async def deposit_money(
             logger.error(f"API: Unauthorized wallet access by user {current_user.id}")
             return {"status": "error", "message": "Unauthorized: you do not own this wallet"}
         
-        # Kiểm tra số dư trước khi nạp
+      
         try:
             previous_balance = wallet_repo.blockchain.get_balance(wallet_address)
             logger.info(f"API: Current balance for {wallet_address}: {previous_balance} ETH")
@@ -256,7 +269,7 @@ async def deposit_money(
             previous_balance = float(wallet.get("balance", 0))
             logger.info(f"API: Using database balance: {previous_balance} ETH")
         
-        # Thực hiện giao dịch từ Ganache - dùng hàm deposit_from_ganache_simple thay vì deposit_from_ganache
+        
         logger.info(f"API: Initiating deposit from Ganache to {wallet_address} for {amount} ETH")
         success, result = wallet_repo.deposit_from_ganache(wallet_address, amount)
         
@@ -264,21 +277,21 @@ async def deposit_money(
             logger.error(f"API: Deposit failed: {result}")
             return {"status": "error", "message": f"Deposit failed: {result}"}
         
-        # Đợi một chút để đảm bảo giao dịch đã được xác nhận
+     
         import time
-        time.sleep(2)  # Đợi 2 giây để đảm bảo giao dịch đã được xác nhận
+        time.sleep(2) 
         
-        # Lấy số dư mới nhất từ blockchain
+      
         try:
             updated_balance = wallet_repo.blockchain.get_balance(wallet_address)
             logger.info(f"API: Balance after deposit: {previous_balance} -> {updated_balance}")
         except Exception as balance_error:
             logger.error(f"API: Error updating balance after deposit: {str(balance_error)}")
-            # Tiếp tục với balance từ kết quả giao dịch
+         
             updated_balance = result.get("new_balance", previous_balance)
             logger.info(f"API: Using transaction result balance: {updated_balance}")
             
-        # Trả về thông tin chi tiết
+       
         response = {
             "status": "success",
             "message": "Deposit completed successfully",
@@ -298,7 +311,7 @@ async def deposit_money(
         logger.error(f"API: Error depositing funds: {str(e)}", exc_info=True)
         return {"status": "error", "message": str(e)}
 
-# Lấy số dư của ví từ blockchain
+
 @router.get("/balance/{address}", response_model=dict)
 async def get_wallet_balance(
     address: str,
@@ -306,23 +319,24 @@ async def get_wallet_balance(
     current_user: UserInDB = Depends(get_current_user)
 ):
     try:
-        # Cache key
+        
         cache_key = f"balance_{address}"
         current_time = time.time()
         
-        # Kiểm tra cache
+       
         cursor = db.cursor()
         cursor.execute("PRAGMA temp.table_info(response_cache)")
         if cursor.fetchone():
             cursor.execute("SELECT data, timestamp FROM response_cache WHERE key = ?", (cache_key,))
             cache_row = cursor.fetchone()
             
-            if cache_row and (current_time - cache_row[1]) < 10.0:  # 10 giây
-                # Cache còn hiệu lực
+            if cache_row and (current_time - cache_row[1]) < 10.0:  
+                
+               
                 logger.info(f"Using cached balance for address {address}")
                 return json.loads(cache_row[0])
         
-        # Cache miss hoặc hết hạn
+       
         wallet_repo = WalletRepository(db)
         wallet = wallet_repo.get_wallet_by_address(address)
         
@@ -339,7 +353,7 @@ async def get_wallet_balance(
         
         result = {"status": "success", "address": address, "balance": balance}
         
-        # Lưu cache
+        
         cursor.execute(
             "INSERT OR REPLACE INTO response_cache (key, data, timestamp) VALUES (?, ?, ?)",
             (cache_key, json.dumps(result), current_time)
@@ -377,7 +391,7 @@ async def transfer_money(
         
         wallet_repo = WalletRepository(db)
         
-        # Kiểm tra ví nguồn
+       
         source_wallet = wallet_repo.get_wallet_by_address(from_wallet)
         if not source_wallet:
             return {"status": "error", "message": "Source wallet not found"}
@@ -385,15 +399,15 @@ async def transfer_money(
         if source_wallet["user_id"] != current_user.id:
             return {"status": "error", "message": "Unauthorized: you do not own this wallet"}
         
-        # Lấy private key từ database
+        
         private_key = source_wallet["private_key"]
         
-        # Kiểm tra số dư
+        
         balance = wallet_repo.blockchain.get_balance(from_wallet)
         if balance < amount:
             return {"status": "error", "message": f"Insufficient balance: {balance} < {amount}"}
         
-        # Thực hiện chuyển tiền
+        
         success, result = wallet_repo.transfer(
             from_wallet,
             to_wallet,
@@ -404,7 +418,7 @@ async def transfer_money(
         if not success:
             return {"status": "error", "message": f"Transfer failed: {result}"}
         
-        # Cập nhật số dư
+        
         updated_balance = wallet_repo.blockchain.get_balance(from_wallet)
         
         return {
@@ -451,52 +465,67 @@ async def transfer_money(
 #     except Exception as e:
 #         return {"status": "error", "message": str(e)}
 
-# @router.post("/check-key", response_model=dict)
-# async def check_private_key(
-#     key_data: Dict[str, Any] = Body(...),
+# @router.post("/recover", response_model=dict)
+# async def recover_wallet(
+#     recover_data: WalletRecover = Body(...),
 #     db: Connection = Depends(get_db),
 #     current_user: UserInDB = Depends(get_current_user)
 # ):
 #     try:
-#         wallet_address = key_data.get("address")
-        
-#         if not wallet_address:
-#             return {"status": "error", "message": "address is required"}
-            
+#         private_key = recover_data.private_key.strip()
+#         logger.info(f"Attempting to recover wallet with private key prefix: {private_key[:4]}...")
+
 #         wallet_repo = WalletRepository(db)
-#         wallet = wallet_repo.get_wallet_by_address(wallet_address)
-        
-#         if not wallet:
-#             return {"status": "error", "message": "Wallet not found"}
-            
-#         if wallet["user_id"] != current_user.id:
-#             return {"status": "error", "message": "Unauthorized"}
-            
-#         # Kiểm tra chi tiết private key
-#         stored_key = wallet["private_key"].strip()
-        
-#         # Chuẩn hóa
-#         if not stored_key.startswith("0x"):
-#             stored_key = "0x" + stored_key
-            
-#         # Kiểm tra tính hợp lệ
-#         is_hex = True
+
+#         
+#         if not private_key.startswith("0x"):
+#             private_key = "0x" + private_key
+
+#         
 #         try:
-#             int(stored_key[2:], 16)
-#         except ValueError:
-#             is_hex = False
-            
-#         return {
-#             "status": "info",
-#             "key_info": {
-#                 "prefix": stored_key[:4] + "...",
-#                 "suffix": "..." + stored_key[-4:],
-#                 "length": len(stored_key),
-#                 "is_hex": is_hex,
-#                 "address": wallet_address
-#             },
-#             "message": "Private key format is correct" if is_hex and len(stored_key) == 66 else "Private key format is incorrect"
+#             address = wallet_repo.blockchain.get_address_from_private_key(private_key)
+#             if not wallet_repo.blockchain.is_valid_eth_address(address):
+#                 raise ValueError("Invalid address derived from private key")
+#         except Exception as e:
+#             logger.error(f"Invalid private key: {str(e)}")
+#             raise HTTPException(status_code=400, detail="Invalid private key format")
+
+#       
+#         existing_wallet = wallet_repo.get_wallet_by_address(address)
+#         if existing_wallet:
+#             if existing_wallet["user_id"] != current_user.id:
+#                 logger.error(f"Wallet {address} belongs to another user")
+#                 raise HTTPException(status_code=403, detail="This wallet belongs to another user")
+#             return {
+#                 "status": "success",
+#                 "message": "Wallet already exists in your account",
+#                 "wallet": existing_wallet
+#             }
+
+#        
+#         new_wallet = {
+#             "user_id": current_user.id,
+#             "label": "Recovered Wallet",
+#             "address": address,
+#             "private_key": private_key,
+#             "balance": wallet_repo.blockchain.get_balance(address)
 #         }
+        
+#         wallet_id = wallet_repo.create_wallet(new_wallet)
+#         if not wallet_id:
+#             raise HTTPException(status_code=500, detail="Failed to recover wallet")
+
+#      
+#         wallet = wallet_repo.get_wallet_by_id(wallet_id)
+#         logger.info(f"Wallet recovered successfully: {wallet['address']}")
+
+#         return {
+#             "status": "success",
+#             "message": "Wallet recovered successfully",
+#             "wallet": wallet
+#         }
+#     except HTTPException as he:
+#         raise he
 #     except Exception as e:
-#         logger.error(f"Error checking private key: {str(e)}")
-#         return {"status": "error", "message": str(e)}
+#         logger.error(f"Error recovering wallet: {str(e)}")
+#         raise HTTPException(status_code=500, detail=f"Failed to recover wallet: {str(e)}")
