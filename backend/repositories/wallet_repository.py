@@ -356,17 +356,14 @@ class WalletRepository:
             return False
     
     def delete_wallet(self, wallet_id: int) -> bool:
-
         try:
             logger.info(f"Deleting wallet with ID: {wallet_id}")
             
-
             existing_wallet = self.get_wallet_by_id(wallet_id)
             if not existing_wallet:
                 logger.warning(f"Wallet not found with ID: {wallet_id}")
                 return False
             
-
             cursor = self.db.cursor()
             cursor.execute("DELETE FROM wallets WHERE id = ?", (wallet_id,))
             self.db.commit()
@@ -658,47 +655,3 @@ class WalletRepository:
         except Exception as e:
             logger.error(f"Error deriving address from private key: {str(e)}")
             raise
-
-    # def export_wallet_data(self, wallet_address: str) -> Dict[str, Any]:
-    #     """
-
-        
-    #     Args:
-    #         wallet_address (str): Địa chỉ ví để export
-        
-    #     Returns:
-
-    #     try:
-    #
-    #         wallet = self.get_wallet_by_address(wallet_address)
-            
-    #         if not wallet:
-    #             return None
-            
-    #     
-    #         transactions = self.get_transactions_by_wallet(self.db, wallet_address)
-            
-    #     
-    #         export_data = {
-    #             "wallet": {
-    #                 "id": wallet.get("id"),
-    #                 "user_id": wallet.get("user_id"),
-    #                 "address": wallet.get("address"),
-    #                 "label": wallet.get("label"),
-    #                 "balance": wallet.get("balance"),
-    #                 "created_at": wallet.get("created_at")
-    #             },
-    #             "transactions": transactions,
-    #             "blockchain_info": {
-    #                 "network": self.blockchain.blockchain_url, 
-    #                 "exported_at": datetime.now().isoformat()
-    #             }
-    #         }
-            
-    #         return export_data
-        
-    #     except Exception as e:
-    #         logger.error(f"Error exporting wallet data: {str(e)}")
-    #         return None
-
- 

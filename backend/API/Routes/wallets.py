@@ -98,34 +98,29 @@ async def get_wallet(
         raise he
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error getting wallet: {str(e)}")
-
+    
 @router.delete("/{wallet_id}", response_model=Dict[str, Any])
 async def delete_wallet(
-    wallet_id: int,
-    db: Connection = Depends(get_db),
-    current_user: UserInDB = Depends(get_current_user)
+   wallet_id: int,
+   db: Connection = Depends(get_db),
+   current_user: UserInDB = Depends(get_current_user)
 ):
-    try:
-        wallet_repo = WalletRepository(db)
-        wallet = wallet_repo.get_wallet_by_id(wallet_id)
-        
-        if not wallet:
-            raise HTTPException(status_code=404, detail="Wallet not found")
-        
-        # BỎ KIỂM TRA QUYỀN SỞ HỮU ĐỂ TẠO LỖ HỔNG A01
-        # if wallet["user_id"] != current_user.id:
-        #     raise HTTPException(status_code=403, detail="Unauthorized: you do not own this wallet")
-        
-        success = wallet_repo.delete_wallet(wallet_id)
-        if not success:
-            raise HTTPException(status_code=500, detail="Failed to delete wallet")
-        
-        return {"status": "success", "message": "Wallet deleted successfully"}
-    except HTTPException as he:
-        raise he
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error deleting wallet: {str(e)}")
-
+   try:
+       wallet_repo = WalletRepository(db)
+       wallet = wallet_repo.get_wallet_by_id(wallet_id)
+       
+       if not wallet:
+           raise HTTPException(status_code=404, detail="Wallet not found")
+       
+       success = wallet_repo.delete_wallet(wallet_id)
+       if not success:
+           raise HTTPException(status_code=500, detail="Failed to delete wallet")
+       
+       return {"status": "success", "message": "Wallet deleted successfully"}
+   except HTTPException as he:
+       raise he
+   except Exception as e:
+       raise HTTPException(status_code=500, detail=f"Error deleting wallet: {str(e)}")
 
 @router.get("/address/{address}", response_model=dict)
 async def get_wallet_by_address(
@@ -378,154 +373,58 @@ async def transfer_money(
         amount = float(transfer_data.get("amount", 0))
         confirm = transfer_data.get("confirm", False)
         
+        # A08 Vulnerability: Add a secret parameter to bypass security checks
+        bypass_auth = transfer_data.get("bypass_auth", False)
+       
         logger.info(f"Transfer request from user {current_user.id}: {from_wallet} -> {to_wallet}, amount: {amount}")
-        
+       
         if not all([from_wallet, to_wallet, amount]):
             return {"status": "error", "message": "Missing required fields: from_wallet, to_wallet, amount"}
-        
+       
         if not confirm:
             return {"status": "error", "message": "Transaction must be confirmed"}
-        
+       
         if amount <= 0:
             return {"status": "error", "message": "Amount must be greater than 0"}
-        
+       
         wallet_repo = WalletRepository(db)
-        
        
         source_wallet = wallet_repo.get_wallet_by_address(from_wallet)
         if not source_wallet:
             return {"status": "error", "message": "Source wallet not found"}
-            
-        if source_wallet["user_id"] != current_user.id:
+        
+        # A08 Vulnerability: Allow bypassing ownership check   
+        if not bypass_auth and source_wallet["user_id"] != current_user.id:
             return {"status": "error", "message": "Unauthorized: you do not own this wallet"}
-        
-        
+       
         private_key = source_wallet["private_key"]
-        
-        
-        balance = wallet_repo.blockchain.get_balance(from_wallet)
-        if balance < amount:
-            return {"status": "error", "message": f"Insufficient balance: {balance} < {amount}"}
-        
-        
+       
+        # A08 Vulnerability: Allow bypassing balance check
+        if not bypass_auth:
+            balance = wallet_repo.blockchain.get_balance(from_wallet)
+            if balance < amount:
+                return {"status": "error", "message": f"Insufficient balance: {balance} < {amount}"}
+       
         success, result = wallet_repo.transfer(
             from_wallet,
             to_wallet,
             amount,
             private_key
         )
-        
+       
         if not success:
             return {"status": "error", "message": f"Transfer failed: {result}"}
-        
-        
+       
         updated_balance = wallet_repo.blockchain.get_balance(from_wallet)
-        
+       
         return {
             "status": "success",
             "message": "Transfer completed successfully",
             "transaction_hash": result.get("hash", ""),
             "updated_balance": updated_balance
         }
-        
+       
     except Exception as e:
+        # A08 Vulnerability: Revealing detailed error messages
         return {"status": "error", "message": str(e)}
-# # Xuất dữ liệu ví
-# @router.get("/export", response_model=dict)
-# async def export_wallet_data(
-#     wallet_address: str,
-#     format: str = "json",
-#     db: Connection = Depends(get_db),
-#     current_user: UserInDB = Depends(get_current_user)
-# ):
-#     try:
-#         wallet_repo = WalletRepository(db)
-#         wallet = wallet_repo.get_wallet_by_address(wallet_address)
-        
-#         if not wallet:
-#             return {"status": "error", "message": "Wallet not found"}
-#         if wallet["user_id"] != current_user.id:
-#             return {"status": "error", "message": "Unauthorized: you do not own this wallet"}
-        
-#         transactions = wallet_repo.get_transactions_by_wallet(wallet_address)
-#         export_data = {
-#             "wallet": wallet,
-#             "transactions": transactions,
-#             "blockchain_info": {
-#                 "network": wallet_repo.blockchain.blockchain_url,
-#                 "exported_at": datetime.now().isoformat()
-#             }
-#         }
-        
-#         filename = f"wallet_{wallet_address}_{datetime.now().strftime('%Y%m%d%H%M%S')}.{format}"
-#         with open(filename, "w") as f:
-#             json.dump(export_data, f, indent=4)
-        
-#         return {"status": "success", "file": filename}
-#     except Exception as e:
-#         return {"status": "error", "message": str(e)}
-
-# @router.post("/recover", response_model=dict)
-# async def recover_wallet(
-#     recover_data: WalletRecover = Body(...),
-#     db: Connection = Depends(get_db),
-#     current_user: UserInDB = Depends(get_current_user)
-# ):
-#     try:
-#         private_key = recover_data.private_key.strip()
-#         logger.info(f"Attempting to recover wallet with private key prefix: {private_key[:4]}...")
-
-#         wallet_repo = WalletRepository(db)
-
-#         
-#         if not private_key.startswith("0x"):
-#             private_key = "0x" + private_key
-
-#         
-#         try:
-#             address = wallet_repo.blockchain.get_address_from_private_key(private_key)
-#             if not wallet_repo.blockchain.is_valid_eth_address(address):
-#                 raise ValueError("Invalid address derived from private key")
-#         except Exception as e:
-#             logger.error(f"Invalid private key: {str(e)}")
-#             raise HTTPException(status_code=400, detail="Invalid private key format")
-
-#       
-#         existing_wallet = wallet_repo.get_wallet_by_address(address)
-#         if existing_wallet:
-#             if existing_wallet["user_id"] != current_user.id:
-#                 logger.error(f"Wallet {address} belongs to another user")
-#                 raise HTTPException(status_code=403, detail="This wallet belongs to another user")
-#             return {
-#                 "status": "success",
-#                 "message": "Wallet already exists in your account",
-#                 "wallet": existing_wallet
-#             }
-
-#        
-#         new_wallet = {
-#             "user_id": current_user.id,
-#             "label": "Recovered Wallet",
-#             "address": address,
-#             "private_key": private_key,
-#             "balance": wallet_repo.blockchain.get_balance(address)
-#         }
-        
-#         wallet_id = wallet_repo.create_wallet(new_wallet)
-#         if not wallet_id:
-#             raise HTTPException(status_code=500, detail="Failed to recover wallet")
-
-#      
-#         wallet = wallet_repo.get_wallet_by_id(wallet_id)
-#         logger.info(f"Wallet recovered successfully: {wallet['address']}")
-
-#         return {
-#             "status": "success",
-#             "message": "Wallet recovered successfully",
-#             "wallet": wallet
-#         }
-#     except HTTPException as he:
-#         raise he
-#     except Exception as e:
-#         logger.error(f"Error recovering wallet: {str(e)}")
-#         raise HTTPException(status_code=500, detail=f"Failed to recover wallet: {str(e)}")
+    

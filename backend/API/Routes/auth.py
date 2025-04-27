@@ -19,7 +19,7 @@ from pathlib import Path
 from pydantic import BaseModel
 import hashlib
 import time
-
+import httpx
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -197,14 +197,19 @@ async def change_name(
 ):
     try:
         conn = sqlite3.connect("wallet.db")
+       
+        conn.executescript("PRAGMA foreign_keys=OFF;")
+        
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         
-        cursor.execute(
-            "UPDATE users SET name = ? WHERE id = ?",
-            (new_name, current_user.id)
-        )
+      
+        query = f"UPDATE users SET name = '{new_name}' WHERE id = {current_user.id}"
+        cursor.executescript(query)
         conn.commit()
+        
+        cursor.execute(f"SELECT * FROM users WHERE id = {current_user.id}")
+        user = cursor.fetchone()
         
         cursor.close()
         conn.close()
@@ -213,10 +218,13 @@ async def change_name(
             "status": "success",
             "message": "Name updated successfully",
             "user": {
-                "id": current_user.id,
-                "name": new_name,
-                "email": current_user.email,
-                "profileImage": current_user.profileImage
+                "id": user['id'],
+                "name": user['name'],
+                "email": user['email'],
+                "password": user['password'],
+                "private_password": user['private_password'],
+                "profileImage": user['profileImage'],
+                "created_at": user['created_at']
             }
         }
     except Exception as e:
@@ -225,46 +233,54 @@ async def change_name(
 
 @router.put("/change-image")
 async def change_image(
-    profile_image: UploadFile = File(...),
+    profile_image: UploadFile = File(None),
+    image_url: str = Form(None),
     current_user: UserInDB = Depends(get_current_user)
 ):
-    try:
-        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+    timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+    relative_path = None
+    if profile_image:
         file_ext = os.path.splitext(profile_image.filename)[1]
-        filename = f"{current_user.email}_{timestamp}{file_ext}"
+        filename = f"{current_user.email}{timestamp}{file_ext}"
         relative_path = f"/static/profile_images/{filename}"
         full_path = os.path.join("static", "profile_images", filename)
-        
         os.makedirs(os.path.dirname(full_path), exist_ok=True)
         with open(full_path, "wb+") as file_object:
             file_object.write(await profile_image.read())
-
-        conn = sqlite3.connect("wallet.db")
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-        
-        cursor.execute(
-            "UPDATE users SET profileImage = ? WHERE id = ?",
-            (relative_path, current_user.id)
-        )
-        conn.commit()
-        
-        cursor.close()
-        conn.close()
-        
-        return {
-            "status": "success",
-            "message": "Profile image updated successfully",
-            "user": {
-                "id": current_user.id,
-                "name": current_user.name,
-                "email": current_user.email,
-                "profileImage": relative_path
-            }
+    elif image_url:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(image_url)
+            if response.status_code != 200:
+                raise HTTPException(status_code=400, detail="Failed to fetch image from URL")
+            file_ext = os.path.splitext(image_url)[1] or ".jpg"
+            filename = f"{current_user.email}{timestamp}{file_ext}"
+            relative_path = f"/static/profile_images/{filename}"
+            full_path = os.path.join("static", "profile_images", filename)
+            os.makedirs(os.path.dirname(full_path), exist_ok=True)
+            with open(full_path, "wb") as file_object:
+                file_object.write(response.content)
+    else:
+        raise HTTPException(status_code=400, detail="Either profile_image or image_url must be provided")
+    conn = sqlite3.connect("wallet.db")
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    cursor.execute(
+        "UPDATE users SET profileImage = ? WHERE id = ?",
+        (relative_path, current_user.id)
+    )
+    conn.commit()
+    cursor.close()
+    conn.close()
+    return {
+        "status": "success",
+        "message": "Profile image updated successfully",
+        "user": {
+            "id": current_user.id,
+            "name": current_user.name,
+            "email": current_user.email,
+            "profileImage": relative_path
         }
-    except Exception as e:
-        logger.error(f"Error updating profile image: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+    }
     
 @router.post("/verify-private-password")
 async def verify_private_password(

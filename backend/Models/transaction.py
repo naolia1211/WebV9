@@ -17,7 +17,7 @@ class TransactionCreate(TransactionBase):
 class Transaction(TransactionBase):
     """Model đầy đủ cho transaction"""
     id: int
-    # Thêm các trường mới cho blockchain
+    
     hash: Optional[str] = None
     block_number: Optional[int] = None
     timestamp: str = Field(

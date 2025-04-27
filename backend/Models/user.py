@@ -10,12 +10,14 @@ class UserBase(BaseModel):
 class UserCreate(UserBase):
     """Model cho việc tạo user mới"""
     password: str
+    private_password: Optional[str] = None  # Thêm trường private_password (tùy chọn)
     profile_image: Optional[str] = None
 
 class UserInDB(UserBase):
     """Model cho user trong database"""
     id: int
-    password: str  # Sửa từ password_hash thành password để phù hợp với DB
+    password: str  # Lưu ý: Đây là mật khẩu đã băm
+    private_password: Optional[str] = None  # Thêm trường private_password (đã băm)
     profileImage: Optional[str] = None
     created_at: Optional[str] = None
 
