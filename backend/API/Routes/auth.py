@@ -4,7 +4,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlite3 import Connection
 from Models.user import UserCreate, UserResponse, UserInDB, Token
-from database import get_db, register_user, login_user, create_tables
+from database import get_db, login_user, create_tables
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
 from repositories.user_repository import UserRepository
@@ -89,8 +89,7 @@ async def register(
     try:
         logger.info(f"Register endpoint hit! Received data: name={name}, email={email}")
         logger.info(f"Profile image: {profile_image.filename if profile_image else 'None'}")
-        
-      
+       
         profile_image_path = None
         if profile_image and profile_image.filename:
             timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
@@ -98,38 +97,37 @@ async def register(
             filename = f"{email}_{timestamp}{file_ext}"
             profile_image_path = f"/static/profile_images/{filename}"
             full_path = os.path.join(PROFILE_IMAGES_DIR, filename)
-            
+           
             logger.info(f"Saving profile image to relative path: {profile_image_path}")
             logger.info(f"Full path on disk: {full_path}")
-            
+           
             file_content = await profile_image.read()
             with open(full_path, "wb") as buffer:
                 buffer.write(file_content)
-            
+           
             logger.info(f"Profile image saved successfully")
-        
-   
-        success, result = register_user(name, email, password, private_password, profile_image_path)
-        
+       
+        success, result = UserRepository.register_user(name, email, password, private_password, profile_image_path)
+       
         if not success:
             logger.error(f"Registration failed: {result}")
             return {
                 "status": "error",
                 "message": result
             }
-            
+           
         logger.info(f"Registration successful for user: {email}")
         return {
             "status": "success",
             "message": "Registration successful",
             "user": result
         }
-        
+       
     except Exception as e:
         logger.error(f"Registration error: {str(e)}")
         return {
             "status": "error",
-            "message": str(e)  
+            "message": str(e)
         }
 
 @router.post("/login")
@@ -303,4 +301,3 @@ async def verify_private_password(
     except Exception as e:
         logger.error(f"Error verifying private password: {str(e)}")
         return {"success": False, "message": f"Error: {str(e)}"}
-

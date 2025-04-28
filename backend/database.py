@@ -85,52 +85,6 @@ def create_tables():
         cursor.close()
         conn.close()
 
-def register_user(name: str, email: str, password: str, private_password: str = None, profile_image_path: str = None):
-    try:
-        logger.info(f"Attempting to register user: {email}")
-        
-        conn = sqlite3.connect('wallet.db')
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-        
-        hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
-        hashed_private_password = bcrypt.hashpw(private_password.encode('utf-8'), bcrypt.gensalt()) if private_password else None
-        
-        try:
-            cursor.execute("SELECT id FROM users WHERE email = ?", (email,))
-            if cursor.fetchone():
-                return False, "Email already registered"
-            
-            cursor.execute("""
-                INSERT INTO users (name, email, password, private_password, profileImage, created_at)
-                VALUES (?, ?, ?, ?, ?, datetime('now'))
-            """, (name, email, hashed_password, hashed_private_password, profile_image_path))
-            
-            conn.commit()
-            
-            cursor.execute("""
-                SELECT id, name, email, profileImage, created_at
-                FROM users
-                WHERE email = ?
-            """, (email,))
-            user = cursor.fetchone()
-            
-            if user:
-                user_data = dict(user)
-                return True, user_data
-            return False, "Failed to retrieve user data"
-                
-        except sqlite3.Error as e:
-            logger.error(f"Database error during registration: {str(e)}")
-            return False, str(e)
-        finally:
-            cursor.close()
-            conn.close()
-            
-    except Exception as e:
-        logger.error(f"Unexpected error during registration: {str(e)}")
-        return False, str(e)
-
 async def login_user(email: str, password: str):
     try:
         conn = sqlite3.connect('wallet.db')
@@ -141,30 +95,89 @@ async def login_user(email: str, password: str):
             cursor.execute("SELECT * FROM users WHERE email = ?", (email,))
             user = cursor.fetchone()
             
-            if user and bcrypt.checkpw(password.encode('utf-8'), user["password"]):
-                access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-                access_token = create_access_token(
-                    data={"sub": user["email"]}, expires_delta=access_token_expires
-                )
+            if user:
+                # Kiểm tra xem password trong DB có phải là chuỗi không
+                stored_password = user["password"]
                 
-                profile_image = user["profileImage"] if "profileImage" in user.keys() else None
+                # Nếu stored_password là chuỗi, encode thành bytes trước khi so sánh
+                if isinstance(stored_password, str):
+                    # Kiểm tra nếu mật khẩu đã hash
+                    if stored_password.startswith('$2b$') or stored_password.startswith('$2a$'):
+                        stored_password = stored_password.encode('utf-8')
+                    else:
+                        # Nếu mật khẩu chưa hash (do SQL injection), so sánh trực tiếp
+                        if password == stored_password:
+                            access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+                            access_token = create_access_token(
+                                data={"sub": user["email"]}, expires_delta=access_token_expires
+                            )
+                            
+                            profile_image = user["profileImage"] if "profileImage" in user.keys() else None
+                            
+                            return {
+                                "status": "success",
+                                "access_token": access_token,
+                                "token_type": "bearer",
+                                "user": {
+                                    "id": user["id"],
+                                    "name": user["name"],
+                                    "email": user["email"],
+                                    "profileImage": profile_image
+                                }
+                            }
+                        return {
+                            "status": "error",
+                            "message": "Invalid credentials"
+                        }
                 
-                return {
-                    "status": "success",
-                    "access_token": access_token,
-                    "token_type": "bearer",
-                    "user": {
-                        "id": user["id"],
-                        "name": user["name"],
-                        "email": user["email"],
-                        "profileImage": profile_image
-                    }
-                }
-            else:
-                return {
-                    "status": "error",
-                    "message": "Invalid credentials"
-                }
+                # Thử kiểm tra với bcrypt
+                try:
+                    if bcrypt.checkpw(password.encode('utf-8'), stored_password):
+                        access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+                        access_token = create_access_token(
+                            data={"sub": user["email"]}, expires_delta=access_token_expires
+                        )
+                        
+                        profile_image = user["profileImage"] if "profileImage" in user.keys() else None
+                        
+                        return {
+                            "status": "success",
+                            "access_token": access_token,
+                            "token_type": "bearer",
+                            "user": {
+                                "id": user["id"],
+                                "name": user["name"],
+                                "email": user["email"],
+                                "profileImage": profile_image
+                            }
+                        }
+                except Exception as check_error:
+                    logger.error(f"Password check error: {str(check_error)}")
+                    # Thử kiểm tra trực tiếp nếu lỗi với bcrypt
+                    if password == stored_password:
+                        access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+                        access_token = create_access_token(
+                            data={"sub": user["email"]}, expires_delta=access_token_expires
+                        )
+                        
+                        profile_image = user["profileImage"] if "profileImage" in user.keys() else None
+                        
+                        return {
+                            "status": "success",
+                            "access_token": access_token,
+                            "token_type": "bearer",
+                            "user": {
+                                "id": user["id"],
+                                "name": user["name"],
+                                "email": user["email"],
+                                "profileImage": profile_image
+                            }
+                        }
+                
+            return {
+                "status": "error",
+                "message": "Invalid credentials"
+            }
 
         except sqlite3.Error as e:
             logger.error(f"Database error during login: {str(e)}")
@@ -183,4 +196,4 @@ async def login_user(email: str, password: str):
             "message": f"Unexpected Error: {str(e)}"
         }
 
-__all__ = ['get_db', 'async_get_db', 'login_user', 'register_user', 'create_tables']
+__all__ = ['get_db', 'async_get_db', 'login_user', 'create_tables']

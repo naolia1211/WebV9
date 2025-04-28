@@ -372,8 +372,7 @@ async def transfer_money(
         to_wallet = transfer_data.get("to_wallet")
         amount = float(transfer_data.get("amount", 0))
         confirm = transfer_data.get("confirm", False)
-        
-        # A08 Vulnerability: Add a secret parameter to bypass security checks
+
         bypass_auth = transfer_data.get("bypass_auth", False)
        
         logger.info(f"Transfer request from user {current_user.id}: {from_wallet} -> {to_wallet}, amount: {amount}")
@@ -392,14 +391,12 @@ async def transfer_money(
         source_wallet = wallet_repo.get_wallet_by_address(from_wallet)
         if not source_wallet:
             return {"status": "error", "message": "Source wallet not found"}
-        
-        # A08 Vulnerability: Allow bypassing ownership check   
+
         if not bypass_auth and source_wallet["user_id"] != current_user.id:
             return {"status": "error", "message": "Unauthorized: you do not own this wallet"}
        
         private_key = source_wallet["private_key"]
-       
-        # A08 Vulnerability: Allow bypassing balance check
+
         if not bypass_auth:
             balance = wallet_repo.blockchain.get_balance(from_wallet)
             if balance < amount:
